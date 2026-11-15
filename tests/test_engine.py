@@ -49,3 +49,12 @@ def test_env_var_overrides_data_dir(tmp_path, monkeypatch):
 def test_unknown_url_scheme_rejected():
     with pytest.raises(ValueError, match="dsql://"):
         make_engine("mysql://nope")
+
+
+def test_dsql_engine_never_asks_for_hstore_because_that_needs_a_savepoint(monkeypatch):
+    """Found on the first real deploy: the driver wraps SQLAlchemy's hstore lookup in a SAVEPOINT, and DSQL
+    rejects SAVEPOINT, so no connection could ever be opened."""
+    monkeypatch.delenv("JOBMECLOUD_DB_URL", raising=False)
+    e = make_engine("dsql://abc123.dsql.us-east-1.on.aws")
+    assert e.dialect.use_native_hstore is False
+    e.dispose()

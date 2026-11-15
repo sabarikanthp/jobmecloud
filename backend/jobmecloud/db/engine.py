@@ -60,6 +60,7 @@ def make_engine(url: str | None = None, data_dir: Path | None = None) -> Engine:
             creator=dsql_creator(url[len(DSQL_PREFIX):], role),
             pool_recycle=2400,  # DSQL closes connections after an hour
             pool_pre_ping=True,
+            use_native_hstore=False,  # the hstore lookup runs inside a SAVEPOINT, which DSQL does not support
         )
     if data_dir is None:
         raise ValueError("Give make_engine a url or a data_dir")
