@@ -34,6 +34,7 @@ from jobmecloud.config import paths
 from jobmecloud.config.settings import ProviderConfig, Settings, SettingsError, load_settings
 from jobmecloud.db.engine import make_engine
 from jobmecloud.db.migrate import migrate
+from jobmecloud.db.retry import ConflictRetryMiddleware
 from jobmecloud.llm.factory import build_provider
 from jobmecloud.llm.types import Provider
 
@@ -57,6 +58,7 @@ def create_app(
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
     )
+    app.add_middleware(ConflictRetryMiddleware)
     app.state.data_dir = data_dir
     app.state.engine = engine
     app.state.provider_builder = provider_builder

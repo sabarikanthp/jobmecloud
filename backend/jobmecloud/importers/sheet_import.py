@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from jobmecloud.db.batch import BATCH_ROWS
 from jobmecloud.db.models import ActivityLog, Contact, CustomField, FollowUp, Job
 from jobmecloud.importers.sheet_helpers import (
     KIND_FIELDS, default_status, guess_field_type, parse_pay, split_location_mode,
@@ -529,6 +530,8 @@ def run_import(session: Session, sheet: Sheet, body: SheetImportIn, *, now: date
                     f"{MAX_ROWS:,}-row limit {_plural(sheet.left_out, 'was', 'were')} left out.")
     for rowno, row in enumerate(sheet.rows, start=1):
         action = handler(run, rowno, row)
+        if rowno % BATCH_ROWS == 0 and not body.dry_run:
+            session.commit()  # keep each transaction under the database's row limit
         if len(run.sample) < SAMPLE_ROWS and action != "left out":
             run.sample.append({"row": rowno, "employer": run.text(row, "employer"),
                                "title": run.text(row, "title") or run.text(row, "name"), "action": action,

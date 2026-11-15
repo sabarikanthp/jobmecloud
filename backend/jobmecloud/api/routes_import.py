@@ -6,6 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from jobmecloud.db.batch import BATCH_ROWS
 from jobmecloud.api.uploads import read_upload
 from jobmecloud.db.models import Job, WatchlistEmployer
 from jobmecloud.importers.text import ImportFileError
@@ -133,6 +134,8 @@ def commit_tracker(body: CommitIn, request: Request) -> dict:
             log(session, entity_type="job", entity_id=job.id, job_id=job.id, action="imported",
                 at=datetime.now(timezone.utc), actor="user", to_value=job.status)
             imported += 1
+            if imported % BATCH_ROWS == 0:
+                session.commit()
         session.commit()
     return {
         "imported": imported,
@@ -181,6 +184,8 @@ def commit_watchlist(body: CommitIn, request: Request) -> dict:
             seen.add(key)
             session.add(employer)
             added += 1
+            if added % BATCH_ROWS == 0:
+                session.commit()
         session.commit()
     return {
         "imported": added,

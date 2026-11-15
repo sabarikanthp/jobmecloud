@@ -28,6 +28,7 @@ from jobmecloud.applydocs.pages import PageCounter, unverified_page_counter
 from jobmecloud.config.profile import MasterResume, SearchProfile, load_resume, load_search
 from jobmecloud.config.settings import DAYS, ProviderConfig, Settings, load_settings
 from jobmecloud.db.models import Job, Run, RunJob, WatchlistEmployer
+from jobmecloud.db.retry import retry_on_conflict
 from jobmecloud.jobs.dedup import dedup_key, fallback_key, normalize_url
 from jobmecloud.jobs.tracking import change_status, log
 from contextlib import nullcontext
@@ -413,6 +414,7 @@ def _save_ai_failed(ctx: _Context, c: Candidate, indexes: _Indexes, error: Excep
     _save_new_job(ctx, job, "new", indexes, c.url)
 
 
+@retry_on_conflict()
 def _mark_duplicate(ctx: _Context, job_id: int) -> None:
     with Session(ctx.engine) as session:
         job = session.get(Job, job_id)
@@ -422,7 +424,8 @@ def _mark_duplicate(ctx: _Context, job_id: int) -> None:
         session.commit()
 
 
-def _save_new_job(ctx: _Context, job: Job, outcome: str, indexes: _Indexes, url: str) -> None:
+@retry_on_conflict()
+def _insert_job(ctx: _Context, job: Job, outcome: str) -> None:
     with Session(ctx.engine) as session:
         session.add(job)
         session.flush()
@@ -431,6 +434,10 @@ def _save_new_job(ctx: _Context, job: Job, outcome: str, indexes: _Indexes, url:
         session.add(RunJob(run_id=ctx.run_id, job_id=job.id, outcome=outcome))
         session.commit()
         session.refresh(job)
+
+
+def _save_new_job(ctx: _Context, job: Job, outcome: str, indexes: _Indexes, url: str) -> None:
+    _insert_job(ctx, job, outcome)
     indexes.add(job, url)
     ctx.new += 1
     if outcome == "excluded":
@@ -592,6 +599,7 @@ def _finish(engine: Engine, run_id: int, ctx: _Context | None, fatal: str | None
     )
 
 
+@retry_on_conflict()
 def _update_run(engine: Engine, run_id: int, **fields) -> None:
     with Session(engine) as session:
         run = session.get(Run, run_id)
