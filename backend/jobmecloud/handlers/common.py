@@ -8,6 +8,7 @@ from sqlalchemy import Engine
 
 from jobmecloud.config import paths
 from jobmecloud.db.engine import make_engine
+from jobmecloud.llm.redact import install_log_redaction
 from jobmecloud.storage.workspace import Workspace
 
 log = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ LAMBDA_MARGIN_MS = 90_000  # stop starting new work when this little time is lef
 
 
 def bootstrap() -> tuple[Path, Engine, Workspace | None]:
+    install_log_redaction()
     data_dir = paths.data_dir()
     workspace = None
     if os.environ.get("JOBMECLOUD_BUCKET"):

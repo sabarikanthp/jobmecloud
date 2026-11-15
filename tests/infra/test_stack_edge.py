@@ -34,11 +34,12 @@ def test_cloudfront_api_behavior_targets_http_api(template):
     assert sorted(behavior["AllowedMethods"]) == ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
 
 
-def test_single_page_app_fallback(template):
+def test_api_errors_are_never_rewritten_into_the_web_page(template):
+    """CloudFront error pages apply to the whole distribution, so none may be set: a real 404 from the
+    API (no such job, no documents yet) must reach the browser as a 404, not as index.html with a 200."""
     dist = only(template, "AWS::CloudFront::Distribution")["DistributionConfig"]
+    assert "CustomErrorResponses" not in dist
     assert dist["DefaultRootObject"] == "index.html"
-    codes = {(e["ErrorCode"], e["ResponsePagePath"], e["ResponseCode"]) for e in dist["CustomErrorResponses"]}
-    assert (403, "/index.html", 200) in codes and (404, "/index.html", 200) in codes
 
 
 def test_site_bucket_only_readable_through_cloudfront(template):

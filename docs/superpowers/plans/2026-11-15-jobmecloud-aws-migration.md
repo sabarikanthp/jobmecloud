@@ -15,7 +15,7 @@
 - Python `>=3.12`; Lambdas are arm64; zip + layer, no container images.
 - No NAT gateway, VPC, VPC endpoints, provisioned concurrency, X-Ray, RDS/Aurora instances, or Secrets Manager secrets.
 - Lambda limits: `api` 30 s / 512 MB; `run-worker` 15 min / 1 GB; `docs-worker` 5 min / 1 GB; `ext-api` (stage 2) 10 s / 256 MB.
-- DSQL: a transaction modifies at most 3,000 rows; DDL and DML in separate transactions, one DDL statement per transaction; indexes via `CREATE INDEX ASYNC`; identity columns are `bigint` with an explicit `CACHE`; `ADD COLUMN` takes a type only; connection lifetime under 1 hour.
+- DSQL: a transaction modifies at most 3,000 rows; DDL and DML in separate transactions, one DDL statement per transaction; indexes via `CREATE INDEX ASYNC`; identity columns are `bigint` with an explicit `CACHE` of 1 or at least 65536 (we use 1; `Identity(cache=100)` in Task 2 was wrong and is fixed); the CloudFront distribution has no custom error responses (they would rewrite API 404s into the web page); `ADD COLUMN` takes a type only; connection lifetime under 1 hour.
 - Secrets in SSM Parameter Store SecureString, standard tier, under `/jobmecloud/`; names keep the form `provider:<id>` and `search:<backend>`.
 - Auth: Cognito Essentials plan, native users, self sign-up disabled, MFA required with authenticator app and email code only. No SMS, no Google/social sign-in, no Bedrock in stage 1.
 - Default `*.cloudfront.net` domain. CloudWatch log retention 14 days. AWS Budgets alert at $5 per month.

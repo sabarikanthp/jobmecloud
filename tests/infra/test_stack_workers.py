@@ -73,3 +73,21 @@ def test_api_can_manage_only_our_schedules(template):
     listing = [s for s in statements(template) if actions(s) == ["scheduler:ListSchedules"]]
     assert len(listing) == 1 and listing[0]["Resource"] == "*"
     assert any(actions(s) == ["iam:PassRole"] for s in statements(template))
+
+
+def ssm_actions_by_function(template):
+    out = {}
+    for name, policy in template.find_resources("AWS::IAM::Policy").items():
+        for s in policy["Properties"]["PolicyDocument"]["Statement"]:
+            if any(a.startswith("ssm:") for a in actions(s)):
+                out[name] = sorted(actions(s))
+    return out
+
+
+def test_only_the_api_may_write_or_delete_secrets(template):
+    by_policy = ssm_actions_by_function(template)
+    api = next(a for n, a in by_policy.items() if n.startswith("ApiFunction"))
+    assert api == ["ssm:DeleteParameter", "ssm:GetParameter", "ssm:PutParameter"]
+    for prefix in ("RunWorkerFunction", "DocsWorkerFunction"):
+        worker = next(a for n, a in by_policy.items() if n.startswith(prefix))
+        assert worker == ["ssm:GetParameter"], prefix

@@ -55,7 +55,9 @@ class Workspace:
                 rel = obj["Key"][len(self.prefix) + 1:] if self.prefix else obj["Key"]
                 if not rel or rel.endswith("/"):
                     continue
-                dest = self.local_dir / rel
+                dest = (self.local_dir / rel).resolve()
+                if not dest.is_relative_to(self.local_dir.resolve()):
+                    continue  # a key like "../x" must never write outside the working folder
                 known = self._manifest.get(rel)
                 if known and known["etag"] == obj["ETag"] and dest.exists():
                     continue

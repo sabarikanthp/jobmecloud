@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from jobmecloud.llm.redact import redact
 from jobmecloud.llm.errors import (
     ModelNotFoundError,
     ProviderAuthError,
@@ -42,8 +43,8 @@ def friendly_message(e: Exception) -> str:
     if isinstance(e, StructuredOutputError):
         return "The AI's answer couldn't be used. Try again, or fill in the form yourself."
     if isinstance(e, ProviderError):
-        return f"The provider returned an error: {e}"
-    return f"Something went wrong: {e}"
+        return redact(f"The provider returned an error: {e}")
+    return redact(f"Something went wrong: {e}")
 
 
 def check_provider(provider: Provider, model: str) -> ConnectionResult:

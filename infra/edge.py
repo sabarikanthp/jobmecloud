@@ -51,10 +51,6 @@ class Edge(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),
             },
-            error_responses=[
-                cloudfront.ErrorResponse(http_status=status, response_http_status=200, response_page_path="/index.html")
-                for status in (403, 404)
-            ],
         )
 
         # Now the site address is known, let the browser app sign users back in to it.

@@ -7,7 +7,7 @@ INTEGER primary key to auto-number, so the bigint type falls back to INTEGER the
 from sqlalchemy import BigInteger, Column, ForeignKey, Identity, Integer
 from sqlmodel import Field
 
-ID_CACHE = 100
+ID_CACHE = 1  # DSQL accepts only CACHE 1 or CACHE >= 65536; 1 keeps ids sequential
 
 
 def _id_type():
