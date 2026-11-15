@@ -1,41 +1,31 @@
-import keyring
-import keyring.backend
+import os
+
 import pytest
+from moto import mock_aws
 from fakes import FakeProvider
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from jobmecloud.api.app import create_app
-from jobmecloud.config import paths
 from jobmecloud.db.engine import make_engine
 from jobmecloud.db.migrate import migrate
 
 
-class _MemoryKeyring(keyring.backend.KeyringBackend):
-    priority = 1
-
-    def __init__(self):
-        self._store = {}
-
-    def set_password(self, service, username, password):
-        self._store[(service, username)] = password
-
-    def get_password(self, service, username):
-        return self._store.get((service, username))
-
-    def delete_password(self, service, username):
-        try:
-            del self._store[(service, username)]
-        except KeyError:
-            raise keyring.errors.PasswordDeleteError("not found")
-
-
 @pytest.fixture(autouse=True)
-def memory_keyring():
-    previous = keyring.get_keyring()
-    keyring.set_keyring(_MemoryKeyring())
-    yield
-    keyring.set_keyring(previous)
+def aws():
+    """Fake AWS (SSM, S3, ...) so no test ever touches a real account."""
+    keep = {k: os.environ.get(k) for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION",
+                                           "AWS_REGION", "AWS_PROFILE")}
+    os.environ.update({"AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing",
+                       "AWS_DEFAULT_REGION": "us-east-1", "AWS_REGION": "us-east-1"})
+    os.environ.pop("AWS_PROFILE", None)
+    with mock_aws():
+        yield
+    for k, v in keep.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
 
 
 @pytest.fixture
@@ -44,11 +34,6 @@ def data_dir(tmp_path, monkeypatch):
     d.mkdir()
     monkeypatch.setenv("JOBMECLOUD_DATA_DIR", str(d))
     return d
-
-
-@pytest.fixture(autouse=True)
-def isolated_location_file(tmp_path, monkeypatch):
-    monkeypatch.setattr(paths, "_location_file", lambda: tmp_path / "config" / "location.json")
 
 
 @pytest.fixture

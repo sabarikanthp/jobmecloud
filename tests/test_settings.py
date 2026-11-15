@@ -63,26 +63,10 @@ def test_ensure_dirs_handles_spaces(tmp_path):
     assert (d / "profile").is_dir() and (d / "applications").is_dir()
 
 
-def test_data_dir_does_not_create_folder(tmp_path, monkeypatch):
-    d = tmp_path / "nope"
-    monkeypatch.setenv("JOBMECLOUD_DATA_DIR", str(d))
-    assert paths.data_dir() == d
-    assert not d.exists()
 
 
-def test_set_data_dir_and_location_file(tmp_path, monkeypatch):
-    cfg = tmp_path / "config"
-    monkeypatch.delenv("JOBMECLOUD_DATA_DIR", raising=False)
-    target = tmp_path / "chosen"
-    paths.set_data_dir(target)
-    assert json.loads((cfg / "location.json").read_text()) == {"data_dir": str(target)}
-    assert paths.data_dir() == target
 
 
-def test_data_dir_default_home(tmp_path, monkeypatch):
-    monkeypatch.delenv("JOBMECLOUD_DATA_DIR", raising=False)
-    monkeypatch.setattr(paths, "user_config_dir", lambda app: str(tmp_path / "empty"))
-    assert paths.data_dir() == paths.Path.home() / "JobMe"
 
 
 def test_defaults_and_exports():

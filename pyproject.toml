@@ -14,7 +14,6 @@ dependencies = [
     "pydantic>=2",
     "pyyaml",
     "platformdirs",
-    "keyring",
     "httpx",
     "beautifulsoup4",
     "jsonschema",
@@ -33,6 +32,7 @@ jobmecloud = "jobmecloud.cli:main"
 
 [dependency-groups]
 dev = [
+    "moto[s3,ssm]>=5.2.5",
     "pytest",
 ]
 
