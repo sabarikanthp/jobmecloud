@@ -1,3 +1,5 @@
+import { authEnabled, getToken, login } from './auth.ts'
+
 export type ProviderKind = 'anthropic' | 'openai_compatible'
 export type StructuredOutput = 'native' | 'prompt'
 export type SearchBackend = 'builtin' | 'tavily' | 'brave'
@@ -38,16 +40,6 @@ export interface SetupState {
   finished: boolean
 }
 
-export interface StorageInfo {
-  data_dir: string
-  applications_dir: string
-  locked: boolean
-}
-
-export interface StorageSaved extends StorageInfo {
-  message: string
-}
-
 export interface UserProfile {
   name: string
   email: string
@@ -58,14 +50,18 @@ export interface UserProfile {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }
+  const token = await getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
   let res: Response
   try {
-    res = await fetch(`/api${path}`, {
-      ...init,
-      headers: init?.body instanceof FormData ? undefined : { 'Content-Type': 'application/json' },
-    })
+    res = await fetch(`/api${path}`, { ...init, headers })
   } catch {
-    throw new Error("Couldn't reach JobMe. Is it still running?")
+    throw new Error("Couldn't reach JobMeCloud. Check your connection and try again.")
+  }
+  if (res.status === 401 && authEnabled()) {
+    await login()
+    throw new Error('Your session has ended. Signing you in again…')
   }
   if (!res.ok) {
     let detail = ''
@@ -124,15 +120,6 @@ export const completeStep = (n: number) =>
   request<SetupState>(`/setup/${n}/complete`, { method: 'POST' })
 
 export const skipStep = (n: number) => request<SetupState>(`/setup/${n}/skip`, { method: 'POST' })
-
-export const getStorage = () => request<StorageInfo>('/storage')
-
-// appsDir: undefined = keep the saved value, '' = reset to the default, text = set it.
-export const saveStorage = (dataDir: string, appsDir?: string) =>
-  request<StorageSaved>('/storage', {
-    method: 'PUT',
-    body: JSON.stringify(appsDir === undefined ? { data_dir: dataDir } : { data_dir: dataDir, applications_dir: appsDir }),
-  })
 
 export const getUser = () => request<UserProfile>('/profile/user')
 

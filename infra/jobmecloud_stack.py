@@ -6,7 +6,7 @@ instances. Costs scale with use and sit inside the AWS free tiers for one person
 
 from pathlib import Path
 
-from aws_cdk import Duration, RemovalPolicy, Stack
+from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
 from aws_cdk import aws_budgets as budgets
 from aws_cdk import aws_dsql as dsql
 from aws_cdk import aws_iam as iam
@@ -16,6 +16,7 @@ from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 from infra.auth import Auth
+from infra.edge import Edge
 
 WORKSPACE_PREFIX = "workspace"
 BUDGET_USD = 5
@@ -52,6 +53,26 @@ class JobMeCloudStack(Stack):
         )
 
         self.auth = Auth(self, "Auth", sender_email=sender_email, account=self.account, region=self.region)
+
+        # API Gateway puts its own host in the request (CloudFront does not pass the viewer's host through).
+        self.api_function = self.make_function(
+            "api", "jobmecloud.handlers.api.handler", timeout=30, memory=512,
+            env={"JOBMECLOUD_ALLOWED_HOSTS": f"*.execute-api.{self.region}.amazonaws.com"},
+        )
+        self.edge = Edge(
+            self, "Edge", api_function=self.api_function, site_bucket=self.site_bucket,
+            user_pool=self.auth.user_pool, client=self.auth.spa_client, region=self.region,
+        )
+        for name, value in {
+            "SiteUrl": self.edge.site_url,
+            "UserPoolId": self.auth.user_pool.user_pool_id,
+            "ClientId": self.auth.spa_client.user_pool_client_id,
+            "SiteBucketName": self.site_bucket.bucket_name,
+            "DistributionId": self.edge.distribution.distribution_id,
+            "LoginDomain": f"{self.auth.domain.domain_name}.auth.{self.region}.amazoncognito.com",
+            "Region": self.region,
+        }.items():
+            CfnOutput(self, name, value=value)
 
         budgets.CfnBudget(
             self, "MonthlyBudget",

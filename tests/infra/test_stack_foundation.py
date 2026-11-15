@@ -44,10 +44,10 @@ def test_functions_are_arm64_python312_with_14_day_logs(stack, lambda_dist):
     from infra.jobmecloud_stack import JobMeCloudStack
     s = JobMeCloudStack(App(), "F", owner_email="o@example.com", sender_email="n@example.com",
                         lambda_dist=lambda_dist, env=ENV)
-    s.make_function("api", "jobmecloud.handlers.api.handler", timeout=30, memory=512)
+    s.make_function("run-worker", "jobmecloud.handlers.run_worker.handler", timeout=900, memory=1024)
     t = assertions.Template.from_stack(s)
     t.has_resource_properties("AWS::Lambda::Function", {
-        "Architectures": ["arm64"], "Runtime": "python3.12", "Timeout": 30, "MemorySize": 512})
+        "Architectures": ["arm64"], "Runtime": "python3.12", "Timeout": 900, "MemorySize": 1024})
     t.has_resource_properties("AWS::Logs::LogGroup", {"RetentionInDays": 14})
     assert lambda_.Architecture.ARM_64.name == "arm64"
 
@@ -58,9 +58,10 @@ def test_function_is_wired_to_data_stores(lambda_dist):
     from infra.jobmecloud_stack import JobMeCloudStack
     s = JobMeCloudStack(App(), "W", owner_email="o@example.com", sender_email="n@example.com",
                         lambda_dist=lambda_dist, env=ENV)
-    s.make_function("api", "jobmecloud.handlers.api.handler", timeout=30, memory=512)
+    s.make_function("run-worker", "jobmecloud.handlers.run_worker.handler", timeout=900, memory=1024)
     t = assertions.Template.from_stack(s)
-    env = list(t.find_resources("AWS::Lambda::Function").values())[0]["Properties"]["Environment"]["Variables"]
+    fns = [f["Properties"] for f in t.find_resources("AWS::Lambda::Function").values()]
+    env = next(f for f in fns if f["Handler"].endswith("run_worker.handler"))["Environment"]["Variables"]
     assert {"JOBMECLOUD_BUCKET", "JOBMECLOUD_DB_URL", "JOBMECLOUD_PREFIX"} <= set(env)
     t.has_resource_properties("AWS::IAM::Policy", {"PolicyDocument": {"Statement": assertions.Match.array_with([
         assertions.Match.object_like({"Action": "dsql:DbConnectAdmin"})])}})

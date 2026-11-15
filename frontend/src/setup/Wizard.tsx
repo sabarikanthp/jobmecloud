@@ -6,7 +6,6 @@ import AiSection from '../sections/AiSection.tsx'
 import ResumeSection from '../sections/ResumeSection.tsx'
 import SearchSection from '../sections/SearchSection.tsx'
 import ScheduleSection from '../sections/ScheduleSection.tsx'
-import StorageSection from '../sections/StorageSection.tsx'
 import WatchlistSection from '../sections/WatchlistSection.tsx'
 import DoneStep from './DoneStep.tsx'
 
@@ -23,7 +22,7 @@ const STEPS: Record<number, string> = {
 }
 const OPTIONAL = new Set([6, 7, 8])
 const INTRO =
-  'JobMe finds jobs that fit you, writes a tailored resume and cover letter for the best ones, and keeps track of everything you apply for. Your information stays on this computer, except what is sent to the AI you choose.'
+  'JobMeCloud finds jobs that fit you, writes a tailored resume and cover letter for the best ones, and keeps track of everything you apply for. Your information stays in your own AWS account, except what is sent to the AI you choose.'
 
 export default function Wizard({ onFinished }: { onFinished: () => void }) {
   const [state, setState] = useState<SetupState | null>(null)
@@ -64,7 +63,10 @@ export default function Wizard({ onFinished }: { onFinished: () => void }) {
     body = (
       <>
         <p>{INTRO}</p>
-        <StorageSection mode="wizard" onSaved={onSaved} />
+        <p className="muted">Your files are kept privately in your own AWS account.</p>
+        <button onClick={() => void onSaved()} disabled={busy}>
+          Get started
+        </button>
       </>
     )
   } else if (step === 2) {

@@ -1,5 +1,4 @@
 import AboutYouSection from '../sections/AboutYouSection.tsx'
-import StorageSection from '../sections/StorageSection.tsx'
 import ResumeSection from '../sections/ResumeSection.tsx'
 import AiSection from '../sections/AiSection.tsx'
 import SearchSection from '../sections/SearchSection.tsx'
@@ -16,7 +15,6 @@ export default function Settings() {
   return (
     <section>
       <h1>Settings</h1>
-      <StorageSection mode="settings" />
       <AiSection mode="settings" />
       <AboutYouSection mode="settings" />
       <ResumeSection mode="settings" />

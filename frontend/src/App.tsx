@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getSetup } from './api.ts'
+import { authEnabled, logout } from './auth.ts'
 import { NavProvider, PAGES, useNav } from './nav.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import FollowUps from './pages/FollowUps.tsx'
@@ -35,7 +36,7 @@ function Shell() {
   return (
     <div className="shell">
       <nav className="nav" aria-label="Main">
-        <div className="brand">JobMe</div>
+        <div className="brand">JobMeCloud</div>
         {PAGES.map((p) => (
           <button
             key={p}
@@ -46,6 +47,11 @@ function Shell() {
             {p}
           </button>
         ))}
+        {authEnabled() && (
+          <button className="nav-item" onClick={logout}>
+            Sign out
+          </button>
+        )}
       </nav>
       <main className="content">
         {page === 'Settings' ? (
