@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from datetime import date
@@ -32,11 +33,13 @@ from jobmecloud.api import (
 from jobmecloud.agents.jobscout.pipeline import RunDeps
 from jobmecloud.config import paths
 from jobmecloud.config.settings import ProviderConfig, Settings, SettingsError, load_settings
-from jobmecloud.db.engine import make_engine
+from jobmecloud.db.engine import DB_URL_ENV, make_engine
 from jobmecloud.db.migrate import migrate
 from jobmecloud.db.retry import ConflictRetryMiddleware
 from jobmecloud.llm.factory import build_provider
 from jobmecloud.llm.types import Provider
+from jobmecloud.storage.sync import WorkspaceSyncMiddleware
+from jobmecloud.storage.workspace import Workspace
 
 FRONTEND_DIST = Path(__file__).resolve().parents[3] / "frontend" / "dist"
 
@@ -46,6 +49,11 @@ def create_app(
     provider_builder: Callable[[ProviderConfig], Provider] = build_provider,
 ) -> FastAPI:
     data_dir = Path(data_dir) if data_dir is not None else paths.data_dir()
+    workspace = None
+    if os.environ.get("JOBMECLOUD_BUCKET"):
+        # In AWS the data folder is a working copy of an S3 prefix.
+        workspace = Workspace(os.environ["JOBMECLOUD_BUCKET"], os.environ.get("JOBMECLOUD_PREFIX", "workspace"), data_dir)
+        workspace.pull()
     engine = make_engine(data_dir=data_dir)
 
     @asynccontextmanager
@@ -54,11 +62,13 @@ def create_app(
         app.state.engine.dispose()
 
     app = FastAPI(title="JobMe", version=jobmecloud.__version__, lifespan=lifespan)
-    # Only answer requests addressed to this computer, which blocks DNS-rebinding pages.
-    app.add_middleware(
-        TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
-    )
+    # Innermost first: retry write conflicts, sync the S3 workspace, then check the Host header last of all
+    # (outermost), which blocks DNS-rebinding pages.
     app.add_middleware(ConflictRetryMiddleware)
+    if workspace is not None:
+        app.add_middleware(WorkspaceSyncMiddleware, workspace=workspace)
+    hosts = os.environ.get("JOBMECLOUD_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver")
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[h.strip() for h in hosts.split(",") if h.strip()])
     app.state.data_dir = data_dir
     app.state.engine = engine
     app.state.provider_builder = provider_builder
@@ -73,7 +83,8 @@ def create_app(
         # A bad settings file is reported by the settings routes, not at startup.
         settings = Settings()
     paths.ensure_dirs(data_dir, settings)
-    migrate(engine)
+    if not os.environ.get(DB_URL_ENV):
+        migrate(engine)  # in AWS the schema is migrated at deploy time
 
     @app.exception_handler(SettingsError)
     async def _settings_error(_: Request, exc: SettingsError):
