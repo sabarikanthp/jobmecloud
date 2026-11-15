@@ -131,3 +131,11 @@ def test_agent_prompt_is_linked_and_keeps_secrets_out_of_chat():
     for needle in ["NEVER ask me to paste a password", "root user", "FRICTION LOG", "one step at a time",
                    "This one is yours", "migrate_db", "create_owner", "publish_site"]:
         assert needle.lower() in prompt.lower(), needle
+
+
+def test_cdk_is_run_directly_and_finds_the_python_app_through_uv():
+    """cdk is a Node tool: `uv run cdk` cannot start it. The CDK app command is what needs uv."""
+    import json
+    assert json.loads(text(ROOT / "cdk.json"))["app"].startswith("uv run python")
+    for path in DOC_FILES:
+        assert "uv run cdk" not in text(path), f"{path.name} still says 'uv run cdk'"

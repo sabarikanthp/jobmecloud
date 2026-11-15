@@ -76,7 +76,7 @@ Sign-in invitations and MFA codes are sent from this address. If you use a diffe
 ## 9. Bootstrap the CDK (once per account and region)
 
 ```
-uv run cdk bootstrap
+cdk bootstrap
 ```
 
 If it asks for the account and region, use `aws://<your account number>/<your region>`. This creates a small bucket the CDK uses for deployments.
@@ -85,7 +85,7 @@ If it asks for the account and region, use `aws://<your account number>/<your re
 
 ```
 uv run python scripts/build_lambdas.py
-uv run cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com -c timezone=America/Chicago
+cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com -c timezone=America/Chicago
 ```
 
 - `owner_email` gets the spending alerts. `sender_email` is the verified SES address. They can be the same.

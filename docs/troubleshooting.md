@@ -6,7 +6,7 @@ Start with the symptom. If your problem is a lost password or authenticator, go 
 
 **`cdk bootstrap` or `cdk deploy` says it cannot find credentials.** Sign in again (`aws sso login --profile <name>`) and set `AWS_PROFILE`. Check with `aws sts get-caller-identity`.
 
-**"This stack uses assets, so the toolkit stack must be deployed."** Run `uv run cdk bootstrap` once in this account and region ([deploy.md](deploy.md)).
+**"This stack uses assets, so the toolkit stack must be deployed."** Run `cdk bootstrap` once in this account and region ([deploy.md](deploy.md)).
 
 **`cdk deploy` says a file is missing in `dist/lambda`.** Run `uv run python scripts/build_lambdas.py` first.
 
