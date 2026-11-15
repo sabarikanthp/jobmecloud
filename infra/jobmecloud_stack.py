@@ -96,6 +96,7 @@ class JobMeCloudStack(Stack):
             "DistributionId": self.edge.distribution.distribution_id,
             "LoginDomain": f"{self.auth.domain.domain_name}.auth.{self.region}.amazoncognito.com",
             "Region": self.region,
+            "DatabaseEndpoint": self.dsql_cluster.attr_endpoint,
         }.items():
             CfnOutput(self, name, value=value)
 

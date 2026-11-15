@@ -64,5 +64,6 @@ def test_api_function_accepts_api_gateway_hosts(template):
 
 def test_outputs_the_deploy_scripts_need(template):
     outputs = template.to_json()["Outputs"]
-    for name in ("SiteUrl", "UserPoolId", "ClientId", "SiteBucketName", "DistributionId", "LoginDomain", "Region"):
+    for name in ("SiteUrl", "UserPoolId", "ClientId", "SiteBucketName", "DistributionId", "LoginDomain", "Region",
+                 "DatabaseEndpoint"):
         assert name in outputs, name

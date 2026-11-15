@@ -6,14 +6,10 @@ from pathlib import Path
 
 import boto3
 
+from jobmecloud.admin.stack import stack_outputs
+
 NO_CACHE = "no-cache"
 IMMUTABLE = "public, max-age=31536000, immutable"  # Vite file names contain a content hash
-
-
-def _outputs(stack_name: str, cfn=None) -> dict[str, str]:
-    cfn = cfn or boto3.client("cloudformation")
-    stack = cfn.describe_stacks(StackName=stack_name)["Stacks"][0]
-    return {o["OutputKey"]: o["OutputValue"] for o in stack.get("Outputs", [])}
 
 
 def publish_site(stack_name: str, dist_dir: Path, *, s3=None, cloudfront=None, cfn=None) -> str:
@@ -23,7 +19,7 @@ def publish_site(stack_name: str, dist_dir: Path, *, s3=None, cloudfront=None, c
         raise FileNotFoundError(f"No built site in {dist_dir}. Run `npm run build` in the frontend folder first.")
     s3 = s3 or boto3.client("s3")
     cloudfront = cloudfront or boto3.client("cloudfront")
-    out = _outputs(stack_name, cfn)
+    out = stack_outputs(stack_name, cfn)
     bucket = out["SiteBucketName"]
 
     for path in sorted(p for p in dist_dir.rglob("*") if p.is_file()):
