@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""CDK entry point: `cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com`."""
+
+import aws_cdk as cdk
+
+from infra.jobmecloud_stack import JobMeCloudStack
+
+app = cdk.App()
+owner_email = app.node.try_get_context("owner_email")
+if not owner_email:
+    raise SystemExit("Pass your email: cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com")
+JobMeCloudStack(
+    app, "JobMeCloud",
+    owner_email=owner_email,
+    sender_email=app.node.try_get_context("sender_email") or owner_email,
+    lambda_dist=app.node.try_get_context("lambda_dist") or "dist/lambda",
+)
+app.synth()

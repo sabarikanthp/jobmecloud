@@ -33,6 +33,8 @@ jobmecloud = "jobmecloud.cli:main"
 
 [dependency-groups]
 dev = [
+    "aws-cdk-lib>=2.277.0",
+    "constructs>=10.8.1",
     "moto[s3,ssm]>=5.2.5",
     "pytest",
 ]
@@ -42,6 +44,6 @@ packages = ["backend/jobmecloud"]
 dev-mode-dirs = ["backend"]
 
 [tool.pytest.ini_options]
-pythonpath = ["backend"]
+pythonpath = ["backend", "."]
 testpaths = ["tests"]
 markers = ["dsql: needs a real Aurora DSQL cluster (set JOBMECLOUD_DB_URL)"]
