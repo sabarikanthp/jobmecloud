@@ -73,3 +73,34 @@ def test_push_never_uploads_database_files(s3, tmp_path):
 def test_presign_has_expiry(s3, tmp_path):
     url = Workspace(BUCKET, "ws", tmp_path).presign("applications/Acme/resume.docx", expires=300)
     assert "ws/applications/Acme/resume.docx" in url and "Expires=" in url
+
+
+def test_push_removes_files_deleted_locally(s3, tmp_path):
+    put(s3, "ws/resumes/old.docx", b"old")
+    put(s3, "ws/keep.txt", b"keep")
+    w = Workspace(BUCKET, "ws", tmp_path)
+    w.pull()
+    (tmp_path / "resumes" / "old.docx").unlink()
+    w.push()
+    keys = [o["Key"] for o in s3.list_objects_v2(Bucket=BUCKET, Prefix="ws/")["Contents"]]
+    assert keys == ["ws/keep.txt"]
+
+
+def test_a_deleted_file_does_not_come_back_on_the_next_pull(s3, tmp_path):
+    put(s3, "ws/resumes/old.docx", b"old")
+    w = Workspace(BUCKET, "ws", tmp_path)
+    w.pull()
+    (tmp_path / "resumes" / "old.docx").unlink()
+    w.push()
+    fresh = Workspace(BUCKET, "ws", tmp_path / "other")
+    fresh.pull()
+    assert not (tmp_path / "other" / "resumes" / "old.docx").exists()
+
+
+def test_files_another_lambda_added_are_not_deleted_by_a_push(s3, tmp_path):
+    w = Workspace(BUCKET, "ws", tmp_path)
+    w.pull()
+    put(s3, "ws/applications/Acme/resume.docx", b"made by the docs worker")  # we have not pulled it yet
+    w.push()
+    keys = [o["Key"] for o in s3.list_objects_v2(Bucket=BUCKET, Prefix="ws/")["Contents"]]
+    assert "ws/applications/Acme/resume.docx" in keys
