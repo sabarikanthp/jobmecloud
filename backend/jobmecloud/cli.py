@@ -18,7 +18,8 @@ from jobmecloud.agents.jobscout.pipeline import (
 from jobmecloud.api.app import create_app
 from jobmecloud.config import paths
 from jobmecloud.config.settings import SettingsError
-from jobmecloud.db.session import get_engine, init_db
+from jobmecloud.db.engine import make_engine
+from jobmecloud.db.migrate import migrate
 from jobmecloud.jobs.runlock import RunInProgressError
 from jobmecloud.llm.connection import friendly_message
 from jobmecloud.llm.factory import build_provider
@@ -58,11 +59,11 @@ def _problem(exc: Exception) -> str:
 def _run() -> int:
     """The scheduled run. Nobody is watching, so every failure ends up on a Run row for Today."""
     data_dir = paths.data_dir()
-    engine = get_engine(data_dir)
+    engine = make_engine(data_dir=data_dir)
     deps = RunDeps(build_provider)
     now = datetime.now(timezone.utc)
     try:
-        init_db(engine)
+        migrate(engine)
         try:
             preflight(data_dir, deps)
         except Exception as exc:

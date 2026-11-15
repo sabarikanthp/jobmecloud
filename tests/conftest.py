@@ -7,7 +7,8 @@ from sqlmodel import Session
 
 from jobmecloud.api.app import create_app
 from jobmecloud.config import paths
-from jobmecloud.db.session import get_engine, init_db
+from jobmecloud.db.engine import make_engine
+from jobmecloud.db.migrate import migrate
 
 
 class _MemoryKeyring(keyring.backend.KeyringBackend):
@@ -59,8 +60,8 @@ def client(data_dir):
 
 @pytest.fixture
 def engine(data_dir):
-    e = get_engine(data_dir)
-    init_db(e)
+    e = make_engine(data_dir=data_dir)
+    migrate(e)
     yield e
     e.dispose()
 

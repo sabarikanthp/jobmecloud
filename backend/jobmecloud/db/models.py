@@ -4,9 +4,11 @@ from typing import Any
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from jobmecloud.db.columns import fk, pk_column
+
 
 class Job(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None = pk_column()
     employer: str
     title: str
     requisition_id: str | None = None
@@ -37,12 +39,12 @@ class Job(SQLModel, table=True):
     docs_folder: str | None = None
     docs_note: str | None = None  # the page note shown on Today
     docs_error: str | None = None  # last Make docs failure, friendly text; cleared on success
-    repost_of_id: int | None = Field(default=None, foreign_key="job.id")
+    repost_of_id: int | None = fk("job.id", optional=True)
     notes: str | None = None
 
 
 class Run(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None = pk_column()
     trigger: str  # schedule / manual
     started_at: datetime
     finished_at: datetime | None = None
@@ -67,23 +69,23 @@ class RunLock(SQLModel, table=True):
 
 
 class RunJob(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    run_id: int = Field(foreign_key="run.id")
-    job_id: int = Field(foreign_key="job.id")
+    id: int | None = pk_column()
+    run_id: int = fk("run.id")
+    job_id: int = fk("job.id")
     outcome: str  # new / duplicate / excluded / matched / prepared / closed
 
 
 class Interview(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="job.id")
+    id: int | None = pk_column()
+    job_id: int = fk("job.id")
     date: datetime | None = None
     stage: str | None = None
     notes: str | None = None
 
 
 class Contact(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    job_id: int | None = Field(default=None, foreign_key="job.id")
+    id: int | None = pk_column()
+    job_id: int | None = fk("job.id", optional=True)
     employer: str | None = None
     name: str | None = None
     role: str | None = None
@@ -94,9 +96,9 @@ class Contact(SQLModel, table=True):
 
 
 class FollowUp(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    job_id: int | None = Field(default=None, foreign_key="job.id")
-    contact_id: int | None = Field(default=None, foreign_key="contact.id")
+    id: int | None = pk_column()
+    job_id: int | None = fk("job.id", optional=True)
+    contact_id: int | None = fk("contact.id", optional=True)
     type: str = Field(sa_column_kwargs={"nullable": True})
     due_date: date = Field(sa_column_kwargs={"nullable": True})
     status: str = Field(sa_column_kwargs={"nullable": True})
@@ -107,10 +109,10 @@ class FollowUp(SQLModel, table=True):
 
 
 class ActivityLog(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None = pk_column()
     entity_type: str = Field(sa_column_kwargs={"nullable": True})  # job / followup / contact / interview
     entity_id: int = Field(sa_column_kwargs={"nullable": True})
-    job_id: int | None = Field(default=None, foreign_key="job.id")
+    job_id: int | None = fk("job.id", optional=True)
     action: str = Field(sa_column_kwargs={"nullable": True})
     from_value: str | None = None
     to_value: str | None = None
@@ -120,7 +122,7 @@ class ActivityLog(SQLModel, table=True):
 
 
 class WatchlistEmployer(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None = pk_column()
     name: str
     priority: int = 2
     careers_url: str | None = None
@@ -129,7 +131,7 @@ class WatchlistEmployer(SQLModel, table=True):
 
 
 class CustomField(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None = pk_column()
     name: str
     type: str  # text / number / date / choice
     choices: list[str] = Field(default_factory=list, sa_column=Column(JSON))
@@ -139,7 +141,7 @@ class CustomField(SQLModel, table=True):
 class CustomValue(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("job_id", "field_id"),)
 
-    id: int | None = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="job.id")
-    field_id: int = Field(foreign_key="customfield.id")
+    id: int | None = pk_column()
+    job_id: int = fk("job.id")
+    field_id: int = fk("customfield.id")
     value: str

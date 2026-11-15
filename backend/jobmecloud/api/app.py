@@ -32,7 +32,8 @@ from jobmecloud.api import (
 from jobmecloud.agents.jobscout.pipeline import RunDeps
 from jobmecloud.config import paths
 from jobmecloud.config.settings import ProviderConfig, Settings, SettingsError, load_settings
-from jobmecloud.db.session import get_engine, init_db
+from jobmecloud.db.engine import make_engine
+from jobmecloud.db.migrate import migrate
 from jobmecloud.llm.factory import build_provider
 from jobmecloud.llm.types import Provider
 
@@ -44,7 +45,7 @@ def create_app(
     provider_builder: Callable[[ProviderConfig], Provider] = build_provider,
 ) -> FastAPI:
     data_dir = Path(data_dir) if data_dir is not None else paths.data_dir()
-    engine = get_engine(data_dir)
+    engine = make_engine(data_dir=data_dir)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -70,7 +71,7 @@ def create_app(
         # A bad settings file is reported by the settings routes, not at startup.
         settings = Settings()
     paths.ensure_dirs(data_dir, settings)
-    init_db(engine)
+    migrate(engine)
 
     @app.exception_handler(SettingsError)
     async def _settings_error(_: Request, exc: SettingsError):

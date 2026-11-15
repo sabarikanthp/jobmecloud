@@ -24,6 +24,8 @@ dependencies = [
     "python-docx>=1.2.0",
     "pypdf>=7.0.1",
     "openpyxl>=3.1.5",
+    "psycopg[binary]>=3.3.9",
+    "boto3>=1.44.3",
 ]
 
 [project.scripts]
@@ -41,3 +43,4 @@ dev-mode-dirs = ["backend"]
 [tool.pytest.ini_options]
 pythonpath = ["backend"]
 testpaths = ["tests"]
+markers = ["dsql: needs a real Aurora DSQL cluster (set JOBMECLOUD_DB_URL)"]

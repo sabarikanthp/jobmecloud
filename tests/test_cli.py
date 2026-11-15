@@ -97,13 +97,14 @@ from sqlmodel import Session, select
 
 from jobmecloud.agents.jobscout.pipeline import RunSetupError, start_run
 from jobmecloud.db.models import Run
-from jobmecloud.db.session import get_engine, init_db
+from jobmecloud.db.engine import make_engine
+from jobmecloud.db.migrate import migrate
 from jobmecloud.jobs.runlock import RunInProgressError, release_run_lock
 
 
 def _runs(data_dir):
-    engine = get_engine(data_dir)
-    init_db(engine)
+    engine = make_engine(data_dir=data_dir)
+    migrate(engine)
     try:
         with Session(engine) as s:
             return list(s.exec(select(Run).order_by(Run.id)))
