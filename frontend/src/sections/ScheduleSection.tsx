@@ -11,8 +11,6 @@ import {
 import SectionCard, { type SectionMode } from '../components/SectionCard.tsx'
 import Tip from '../components/Tip.tsx'
 
-const UNSUPPORTED = 'Scheduling from JobMe works on Windows. See docs/scheduling-mac-linux.md.'
-
 const DAYS: [string, string][] = [
   ['mon', 'Monday'],
   ['tue', 'Tuesday'],
@@ -27,7 +25,6 @@ interface Snapshot {
   days: string[]
   times: string[]
   cutoff: string
-  wake: boolean
 }
 
 function localTime(iso: string): string {
@@ -44,11 +41,10 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
   const [days, setDays] = useState<string[]>([])
   const [times, setTimes] = useState<string[]>([])
   const [cutoff, setCutoff] = useState('75')
-  const [wake, setWake] = useState(false)
   const [status, setStatus] = useState<ScheduleStatus | null>(null)
   const [autoBusy, setAutoBusy] = useState(false)
   const [autoError, setAutoError] = useState('')
-  const [saved, setSaved] = useState<Snapshot>({ days: [], times: [], cutoff: '75', wake: false })
+  const [saved, setSaved] = useState<Snapshot>({ days: [], times: [], cutoff: '75' })
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState('')
 
@@ -56,18 +52,16 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
     setDays(s.days)
     setTimes(s.times)
     setCutoff(s.cutoff)
-    setWake(s.wake)
   }
 
   useEffect(() => {
     getSettings()
       .then((s) => {
-        const sched = (s.schedule ?? {}) as { days?: string[]; times?: string[]; wake?: boolean }
+        const sched = (s.schedule ?? {}) as { days?: string[]; times?: string[] }
         const snap = {
           days: sched.days ?? [],
           times: sched.times ?? [],
           cutoff: String(s.match_cutoff ?? 75),
-          wake: sched.wake === true,
         }
         apply(snap)
         setSaved(snap)
@@ -100,8 +94,8 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
   const turnOn = () =>
     autoAction(async () => {
       const orderedDays = DAYS.map(([k]) => k).filter((k) => days.includes(k))
-      await scheduleOn({ days: orderedDays, times: cleanTimes, wake })
-      setSaved((prev) => ({ ...prev, days: orderedDays, times: cleanTimes, wake }))
+      await scheduleOn({ days: orderedDays, times: cleanTimes })
+      setSaved((prev) => ({ ...prev, days: orderedDays, times: cleanTimes }))
     })
 
   const turnOff = () => autoAction(() => scheduleOff())
@@ -117,11 +111,11 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
     const current = await getSettings()
     const next: Settings = {
       ...current,
-      schedule: { ...(current.schedule as object), days: orderedDays, times: cleanTimes, wake },
+      schedule: { ...(current.schedule as object), days: orderedDays, times: cleanTimes },
       match_cutoff: n,
     }
     await saveSettings(next)
-    const snap = { days: orderedDays, times: cleanTimes, cutoff: String(n), wake }
+    const snap = { days: orderedDays, times: cleanTimes, cutoff: String(n) }
     apply(snap)
     setSaved(snap)
     await onSaved?.()
@@ -159,7 +153,7 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
                 {name}
               </label>
             ))}
-            <span className="help">JobMe will search on the days you tick.</span>
+            <span className="help">JobMeCloud will search on the days you tick.</span>
           </fieldset>
           <div className="field">
             <div className="field-label">Times of day</div>
@@ -177,24 +171,15 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
             <div>
               <button className="add" onClick={() => setTimes([...times, ''])}>Add a time</button>
             </div>
-            <span className="help">The times of day JobMe should search on those days.</span>
+            <span className="help">The times of day JobMeCloud should search on those days.</span>
           </div>
           {mode === 'settings' && (
             <div className="field" role="group" aria-labelledby="auto-heading">
               <div className="field-label" id="auto-heading">
                 Automatic search
               </div>
-              {status && !status.supported && <p className="muted">{UNSUPPORTED}</p>}
               {(status === null || status.supported) && (
                 <>
-                  <label className="check">
-                    <input type="checkbox" checked={wake} onChange={(e) => setWake(e.target.checked)} /> Wake the PC from
-                    sleep to run
-                  </label>
-                  <span className="help">
-                    Works from sleep, not from a full shutdown. Off by default so a sleeping laptop is not woken without
-                    you asking.
-                  </span>
                   {status && (
                     <p>
                       {status.enabled
@@ -203,8 +188,7 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
                     </p>
                   )}
                   <p className="help">
-                    JobMe runs while you are logged in to Windows (a locked screen is fine) and the PC is on. A run
-                    missed while the PC was asleep or off happens as soon as it is back on.
+                    JobMeCloud searches in your own AWS account at the times above, even when your computer is off.
                   </p>
                   {autoError && <div className="result bad">{autoError}</div>}
                   <div className="row">
@@ -220,7 +204,7 @@ export default function ScheduleSection({ mode, onSaved }: { mode: SectionMode; 
                     </button>
                   </div>
                   {status?.enabled && (
-                    <span className="help">Changed the days, times or wake setting? Press Update schedule to apply it.</span>
+                    <span className="help">Changed the days or times? Press Update schedule to apply it.</span>
                   )}
                 </>
               )}

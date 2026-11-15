@@ -26,6 +26,7 @@ dependencies = [
     "psycopg[binary]>=3.3.9",
     "boto3>=1.44.3",
     "mangum>=0.22.0",
+    "tzdata>=2026.6",
 ]
 
 [project.scripts]
@@ -35,7 +36,7 @@ jobmecloud = "jobmecloud.cli:main"
 dev = [
     "aws-cdk-lib>=2.277.0",
     "constructs>=10.8.1",
-    "moto[cloudformation,cognitoidp,s3,sns,ssm]>=5.2.5",
+    "moto[cloudformation,cognitoidp,s3,scheduler,sns,ssm]>=5.2.5",
     "pytest",
 ]
 

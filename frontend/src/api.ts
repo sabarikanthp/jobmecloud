@@ -789,13 +789,12 @@ export interface ScheduleStatus {
   next_run: string | null
   days: string[]
   times: string[]
-  wake: boolean
   last_run: ScheduleLastRun | null
 }
 
 export const getSchedule = () => request<ScheduleStatus>('/schedule')
 
-export const scheduleOn = (body: { days: string[]; times: string[]; wake: boolean }) =>
+export const scheduleOn = (body: { days: string[]; times: string[] }) =>
   request<{ enabled: boolean }>('/schedule/on', post(body))
 
 export const scheduleOff = () => request<{ enabled: boolean }>('/schedule/off', post({}))

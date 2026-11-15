@@ -40,7 +40,6 @@ class Price(BaseModel):
 
 class Schedule(BaseModel):
     enabled: bool = False
-    wake: bool = False
     days: list[Day] = []
     times: list[Annotated[str, StringConstraints(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]] = []
 

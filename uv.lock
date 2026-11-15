@@ -802,6 +802,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "sqlmodel" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -832,6 +833,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.33" },
     { name = "pyyaml" },
     { name = "sqlmodel" },
+    { name = "tzdata", specifier = ">=2026.6" },
     { name = "uvicorn" },
 ]
 
@@ -839,7 +841,7 @@ requires-dist = [
 dev = [
     { name = "aws-cdk-lib", specifier = ">=2.277.0" },
     { name = "constructs", specifier = ">=10.8.1" },
-    { name = "moto", extras = ["cloudformation", "cognitoidp", "s3", "sns", "ssm"], specifier = ">=5.2.5" },
+    { name = "moto", extras = ["cloudformation", "cognitoidp", "s3", "scheduler", "sns", "ssm"], specifier = ">=5.2.5" },
     { name = "pytest" },
 ]
 

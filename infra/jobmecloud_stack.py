@@ -65,6 +65,10 @@ class JobMeCloudStack(Stack):
             env={"TZ": timezone}, no_retries=True,
         )
 
+        # EventBridge Scheduler starts the run-worker on the owner's chosen days and times, using this role.
+        self.scheduler_role = iam.Role(self, "SchedulerRole", assumed_by=iam.ServicePrincipal("scheduler.amazonaws.com"))
+        self.run_worker.grant_invoke(self.scheduler_role)
+
         # API Gateway puts its own host in the request (CloudFront does not pass the viewer's host through).
         self.api_function = self.make_function(
             "api", "jobmecloud.handlers.api.handler", timeout=30, memory=512,
@@ -72,9 +76,13 @@ class JobMeCloudStack(Stack):
                 "JOBMECLOUD_ALLOWED_HOSTS": f"*.execute-api.{self.region}.amazonaws.com",
                 "JOBMECLOUD_RUN_FUNCTION": self.run_worker.function_name,
                 "JOBMECLOUD_DOCS_FUNCTION": self.docs_worker.function_name,
+                "JOBMECLOUD_RUN_FUNCTION_ARN": self.run_worker.function_arn,
+                "JOBMECLOUD_SCHEDULER_ROLE_ARN": self.scheduler_role.role_arn,
+                "JOBMECLOUD_TIMEZONE": timezone,
             },
         )
         self.run_worker.grant_invoke(self.api_function)
+        self._allow_scheduling(timezone)
         self.docs_worker.grant_invoke(self.api_function)
         self.edge = Edge(
             self, "Edge", api_function=self.api_function, site_bucket=self.site_bucket,
@@ -108,6 +116,19 @@ class JobMeCloudStack(Stack):
                 for kind, threshold in (("ACTUAL", 80), ("FORECASTED", 100))
             ],
         )
+
+    def _allow_scheduling(self, timezone: str) -> None:
+        """The API may create, change and delete only the jobmecloud-run-* schedules, and hand them the role."""
+        self.api_function.add_to_role_policy(iam.PolicyStatement(
+            actions=["scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:DeleteSchedule",
+                     "scheduler:GetSchedule"],
+            resources=[self.format_arn(service="scheduler", resource="schedule", resource_name="default/jobmecloud-run-*")],
+        ))
+        self.api_function.add_to_role_policy(iam.PolicyStatement(actions=["scheduler:ListSchedules"], resources=["*"]))
+        self.api_function.add_to_role_policy(iam.PolicyStatement(
+            actions=["iam:PassRole"], resources=[self.scheduler_role.role_arn],
+            conditions={"StringEquals": {"iam:PassedToService": "scheduler.amazonaws.com"}},
+        ))
 
     def make_function(self, name: str, handler: str, *, timeout: int, memory: int,
                       env: dict[str, str] | None = None, no_retries: bool = False) -> lambda_.Function:
