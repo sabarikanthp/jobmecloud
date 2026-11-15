@@ -1,0 +1,33 @@
+{
+  "summary": "Software engineer with eight years of experience building backend services and data pipelines.",
+  "roles": [
+    {
+      "employer": "Northwind Labs",
+      "title": "Senior Software Engineer",
+      "start": "2021-03",
+      "end": "",
+      "location": "Austin, TX",
+      "bullets": [
+        "Built an order-tracking API used by 40 internal teams.",
+        "Cut nightly batch time from 4 hours to 45 minutes."
+      ]
+    },
+    {
+      "employer": "Contoso Health",
+      "title": "Software Engineer",
+      "start": "2017-06",
+      "end": "2021-02",
+      "location": "Remote",
+      "bullets": [
+        "Maintained appointment-scheduling services in Python and PostgreSQL."
+      ]
+    }
+  ],
+  "skills": ["Python", "PostgreSQL", "REST APIs", "Docker"],
+  "education": [
+    {"school": "Example State University", "degree": "BS", "field": "Computer Science", "year": "2017"}
+  ],
+  "certifications": [
+    {"name": "Example Cloud Practitioner", "issuer": "Example Cloud", "year": "2022"}
+  ]
+}

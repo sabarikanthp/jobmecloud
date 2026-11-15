@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jobmecloud"
+version = "0.1.0"
+description = "Serverless job-search assistant for AWS"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "sqlmodel",
+    "pydantic>=2",
+    "pyyaml",
+    "platformdirs",
+    "keyring",
+    "httpx",
+    "beautifulsoup4",
+    "jsonschema",
+    "anthropic",
+    "openai",
+    "python-multipart>=0.0.33",
+    "python-docx>=1.2.0",
+    "pypdf>=7.0.1",
+    "openpyxl>=3.1.5",
+]
+
+[project.scripts]
+jobmecloud = "jobmecloud.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/jobmecloud"]
+dev-mode-dirs = ["backend"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["tests"]

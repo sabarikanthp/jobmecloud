@@ -1,0 +1,23 @@
+target_roles:
+  - Software Engineer
+  - Backend Engineer
+positioning: Backend engineer who likes data-heavy products and small teams.
+locations:
+  - Austin, TX
+radius_miles: 25
+work_modes:
+  - remote
+  - hybrid
+min_base_pay: 120000
+excluded_employers: []
+deal_breakers:
+  - Requires security clearance
+warnings:
+  - Mandatory on-call rotation
+max_commute_miles: 20
+max_posted_days: 30
+do_not_claim:
+  - Kubernetes administration
+rotation:
+  mon: Austin
+  tue: Remote

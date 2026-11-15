@@ -1,0 +1,109 @@
+from collections.abc import Callable
+from contextlib import asynccontextmanager
+from datetime import date
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+import jobmecloud
+from jobmecloud.api import (
+    routes_connections,
+    routes_contacts,
+    routes_dashboard,
+    routes_fields,
+    routes_followups,
+    routes_import,
+    routes_joblist,
+    routes_jobs,
+    routes_models,
+    routes_profile,
+    routes_resumes,
+    routes_runs,
+    routes_settings,
+    routes_setup,
+    routes_sheet_import,
+    routes_tracking,
+    routes_watchlist,
+)
+from jobmecloud.agents.jobscout.pipeline import RunDeps
+from jobmecloud.config import paths
+from jobmecloud.config.settings import ProviderConfig, Settings, SettingsError, load_settings
+from jobmecloud.db.session import get_engine, init_db
+from jobmecloud.llm.factory import build_provider
+from jobmecloud.llm.types import Provider
+
+FRONTEND_DIST = Path(__file__).resolve().parents[3] / "frontend" / "dist"
+
+
+def create_app(
+    data_dir: Path | None = None,
+    provider_builder: Callable[[ProviderConfig], Provider] = build_provider,
+) -> FastAPI:
+    data_dir = Path(data_dir) if data_dir is not None else paths.data_dir()
+    engine = get_engine(data_dir)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        app.state.engine.dispose()
+
+    app = FastAPI(title="JobMe", version=jobmecloud.__version__, lifespan=lifespan)
+    # Only answer requests addressed to this computer, which blocks DNS-rebinding pages.
+    app.add_middleware(
+        TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
+    )
+    app.state.data_dir = data_dir
+    app.state.engine = engine
+    app.state.provider_builder = provider_builder
+    app.state.run_deps = RunDeps(provider_builder)
+    app.state.run_thread = None
+    app.state.open_path = routes_jobs.default_open_path
+    app.state.today = date.today
+
+    try:
+        settings = load_settings(data_dir)
+    except SettingsError:
+        # A bad settings file is reported by the settings routes, not at startup.
+        settings = Settings()
+    paths.ensure_dirs(data_dir, settings)
+    init_db(engine)
+
+    @app.exception_handler(SettingsError)
+    async def _settings_error(_: Request, exc: SettingsError):
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_: Request, exc: RequestValidationError):
+        # Default handler echoes the request body, which could contain an API key.
+        detail = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+        return JSONResponse({"detail": detail}, status_code=422)
+
+    @app.get("/api/health")
+    def health():
+        return {"ok": True, "version": jobmecloud.__version__}
+
+    app.include_router(routes_settings.router, prefix="/api")
+    app.include_router(routes_connections.router, prefix="/api")
+    app.include_router(routes_profile.router, prefix="/api")
+    app.include_router(routes_setup.router, prefix="/api")
+    app.include_router(routes_models.router, prefix="/api")
+    app.include_router(routes_watchlist.router, prefix="/api")
+    app.include_router(routes_import.router, prefix="/api")
+    app.include_router(routes_runs.router, prefix="/api")
+    app.include_router(routes_resumes.router, prefix="/api")
+    app.include_router(routes_joblist.router, prefix="/api")
+    app.include_router(routes_jobs.router, prefix="/api")
+    app.include_router(routes_followups.router, prefix="/api")
+    app.include_router(routes_tracking.router, prefix="/api")
+    app.include_router(routes_contacts.router, prefix="/api")
+    app.include_router(routes_dashboard.router, prefix="/api")
+    app.include_router(routes_fields.router, prefix="/api")
+    app.include_router(routes_sheet_import.router, prefix="/api")
+
+    if FRONTEND_DIST.is_dir():
+        app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+    return app
