@@ -29,5 +29,14 @@ def test_schema_roundtrip_with_json_and_foreign_key():
         s.commit()
         s.add(RunJob(run_id=run.id, job_id=job.id, outcome="new"))
         s.commit()
-        got = s.exec(select(Job).where(Job.id == job.id)).one()
-        assert got.flags == ["older post"] and isinstance(got.id, int)
+        try:
+            got = s.exec(select(Job).where(Job.id == job.id)).one()
+            assert got.flags == ["older post"] and isinstance(got.id, int)
+        finally:  # leave the real database as we found it
+            s.rollback()
+            for row in s.exec(select(RunJob).where(RunJob.run_id == run.id)):
+                s.delete(row)
+            s.commit()
+            s.delete(s.get(Job, job.id))
+            s.delete(s.get(Run, run.id))
+            s.commit()

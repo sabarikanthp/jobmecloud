@@ -12,8 +12,12 @@ from jobmecloud.db.migrate import migrate
 
 
 @pytest.fixture(autouse=True)
-def aws():
-    """Fake AWS (SSM, S3, ...) so no test ever touches a real account."""
+def aws(request):
+    """Fake AWS (SSM, S3, ...) so no test ever touches a real account. Tests marked `dsql` are the exception:
+    they exist to talk to a real cluster, using your real credentials."""
+    if request.node.get_closest_marker("dsql"):
+        yield
+        return
     keep = {k: os.environ.get(k) for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION",
                                            "AWS_REGION", "AWS_PROFILE")}
     os.environ.update({"AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing",
