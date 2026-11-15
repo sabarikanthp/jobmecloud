@@ -2,7 +2,8 @@
 
 The app's code reads and writes plain files under a data folder. In Lambda that folder is /tmp, so each
 invocation pulls what S3 holds and pushes back what changed, instead of every call site learning about S3.
-Files deleted locally are not deleted in S3.
+A file this workspace pulled and later finds missing locally is deleted from S3 on the next push.
+Files another Lambda added after the last pull are left alone.
 """
 
 import hashlib
@@ -78,6 +79,9 @@ class Workspace:
             etag = self._s3.head_object(Bucket=self.bucket, Key=key)["ETag"]
             self._manifest[rel] = {"etag": etag, "md5": md5}
             pushed.append(key)
+        for rel in [r for r in self._manifest if not (self.local_dir / r).exists()]:
+            self._s3.delete_object(Bucket=self.bucket, Key=self._key(rel))
+            del self._manifest[rel]
         self._save_manifest()
         return pushed
 
