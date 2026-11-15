@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { makeDocs, openDoc, useAsIs as applyAsIs, type ResumeEntry } from '../api.ts'
+import { authEnabled } from '../auth.ts'
 import { errorText } from './jobFormat.ts'
 import { STALE_NOTE, type DocsRunner } from './docsTypes.ts'
 
@@ -81,14 +82,16 @@ export default function DocsActions({
       {hasDocs && (
         <div className="row">
           <button type="button" onClick={() => void open('resume')}>
-            Open resume
+            {authEnabled() ? 'Download resume' : 'Open resume'}
           </button>
           <button type="button" onClick={() => void open('cover_letter')}>
-            Open cover letter
+            {authEnabled() ? 'Download cover letter' : 'Open cover letter'}
           </button>
-          <button type="button" onClick={() => void open('folder')}>
-            Open folder
-          </button>
+          {!authEnabled() && (
+            <button type="button" onClick={() => void open('folder')}>
+              Open folder
+            </button>
+          )}
         </div>
       )}
       {job.docs_note && <p className="help">{job.docs_note}</p>}

@@ -55,7 +55,8 @@ def test_browser_client_sends_users_back_to_the_site(template):
 
 
 def test_api_function_accepts_api_gateway_hosts(template):
-    fn = only(template, "AWS::Lambda::Function")
+    fn = next(f["Properties"] for f in template.find_resources("AWS::Lambda::Function").values()
+              if f["Properties"]["Handler"] == "jobmecloud.handlers.api.handler")
     hosts = fn["Environment"]["Variables"]["JOBMECLOUD_ALLOWED_HOSTS"]
     assert hosts == "*.execute-api.us-east-1.amazonaws.com"
     assert fn["Handler"] == "jobmecloud.handlers.api.handler" and fn["Timeout"] == 30 and fn["MemorySize"] == 512

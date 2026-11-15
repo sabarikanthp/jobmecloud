@@ -36,6 +36,7 @@ from jobmecloud.config.settings import ProviderConfig, Settings, SettingsError, 
 from jobmecloud.db.engine import DB_URL_ENV, make_engine
 from jobmecloud.db.migrate import migrate
 from jobmecloud.db.retry import ConflictRetryMiddleware
+from jobmecloud.jobs.dispatch import LambdaDispatcher, ThreadDispatcher
 from jobmecloud.llm.factory import build_provider
 from jobmecloud.llm.types import Provider
 from jobmecloud.storage.sync import WorkspaceSyncMiddleware
@@ -74,6 +75,10 @@ def create_app(
     app.state.provider_builder = provider_builder
     app.state.run_deps = RunDeps(provider_builder)
     app.state.run_thread = None
+    app.state.workspace = workspace
+    app.state.dispatcher = (
+        LambdaDispatcher() if os.environ.get("JOBMECLOUD_RUN_FUNCTION") else ThreadDispatcher(app.state)
+    )
     app.state.open_path = routes_jobs.default_open_path
     app.state.today = date.today
 

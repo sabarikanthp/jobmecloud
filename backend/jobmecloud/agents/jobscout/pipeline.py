@@ -62,6 +62,7 @@ class RunLostError(Exception):
     """This run's lock was taken over (the computer was probably asleep), so it must stop."""
 
 
+STOPPED_EARLY_COPY = "Stopped early to stay within the time limit."
 LOST_COPY = "This run stopped because another run took over (the computer may have been asleep)."
 
 
@@ -80,6 +81,7 @@ class RunDeps:
     search_builder: Callable[[str], SearchBackend] = build_search
     fetch: Callable[[str], FetchResult] = fetch_page
     page_counter: PageCounter = unverified_page_counter
+    should_stop: Callable[[], bool] = lambda: False  # true when the Lambda is nearly out of time
 
 
 @dataclass
@@ -104,6 +106,7 @@ class _Context:
     errors: list[str] = field(default_factory=list)
     cost_cap_noted: bool = False
     ai_errors_seen: set[str] = field(default_factory=set)
+    stopped: bool = False
 
 
 @dataclass
@@ -144,6 +147,17 @@ def start_run(engine: Engine, trigger: Literal["manual", "schedule"], now: datet
     except BaseException:
         release_run_lock(engine, owner)
         raise
+
+
+def abandon_run(engine: Engine, run_id: int, message: str, now: datetime) -> None:
+    """Close a run that was started but never handed to a worker, and give its lock back."""
+    with Session(engine) as session:
+        run = session.get(Run, run_id)
+        owner = run.lock_owner
+        run.finished_at, run.stage, run.errors = now, None, [message]
+        session.add(run)
+        session.commit()
+    release_run_lock(engine, owner)
 
 
 def record_failed_run(engine: Engine, trigger: Literal["manual", "schedule"], now: datetime, message: str) -> int:
@@ -297,6 +311,8 @@ def _load_indexes(ctx: _Context) -> _Indexes:
 def _read_candidates(ctx: _Context, candidates: list[Candidate], indexes: _Indexes) -> None:
     n = len(candidates)
     for i, c in enumerate(candidates, 1):
+        if _out_of_time(ctx):
+            break
         _save_progress(ctx, stage=STAGE_READING.format(i=i, n=n))
         try:
             _read_one(ctx, c, indexes)
@@ -446,6 +462,16 @@ def _save_new_job(ctx: _Context, job: Job, outcome: str, indexes: _Indexes, url:
         ctx.matched += 1
 
 
+def _out_of_time(ctx: _Context) -> bool:
+    """True once the worker is nearly out of time; the first call records why the run ended early."""
+    if not ctx.deps.should_stop():
+        return False
+    if not ctx.stopped:
+        ctx.stopped = True
+        ctx.errors.append(STOPPED_EARLY_COPY)
+    return True
+
+
 def _note_cost_cap(ctx: _Context) -> None:
     if not ctx.cost_cap_noted:
         ctx.errors.append(COST_CAP_COPY.format(cap=ctx.settings.caps.max_spend_per_run_usd))
@@ -476,6 +502,8 @@ def _prepare_docs(ctx: _Context) -> None:
         ).all()
     provider, model = ctx.models["tailor"]
     for i, (run_job_id, job_id, employer, title) in enumerate(rows, 1):
+        if _out_of_time(ctx):
+            return
         _save_progress(ctx, stage=STAGE_WRITING.format(i=i, n=len(rows)))
         if ctx.costs.exceeded:
             _note_cost_cap(ctx)
@@ -538,6 +566,8 @@ def _recheck_older_jobs(ctx: _Context) -> None:
             and _worth_rechecking(j, since)
         ]
     for job_id, employer, title, url in due:
+        if _out_of_time(ctx):
+            break
         try:
             _recheck_one(ctx, job_id, title, url)
         except Exception as e:

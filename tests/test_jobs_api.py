@@ -89,7 +89,7 @@ def test_file_in_use_is_409(client, monkeypatch):
 
     def boom(*a, **k):
         raise FileInUseError("resume.docx")
-    monkeypatch.setattr("jobmecloud.api.routes_jobs.make_docs", boom)
+    monkeypatch.setattr("jobmecloud.applydocs.service.make_docs", boom)
     r = client.post(f"/api/jobs/{job_id}/docs", json={})
     assert r.status_code == 409 and r.json()["detail"] == "Close resume.docx in Word, then try again."
 

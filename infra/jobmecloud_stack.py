@@ -35,7 +35,7 @@ def _private_bucket(scope: Construct, id: str, *, versioned: bool) -> s3.Bucket:
 
 class JobMeCloudStack(Stack):
     def __init__(self, scope: Construct, id: str, *, owner_email: str, sender_email: str,
-                 lambda_dist: str, **kwargs) -> None:
+                 lambda_dist: str, timezone: str = "UTC", **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
         self.owner_email = owner_email
         self.sender_email = sender_email
@@ -54,11 +54,28 @@ class JobMeCloudStack(Stack):
 
         self.auth = Auth(self, "Auth", sender_email=sender_email, account=self.account, region=self.region)
 
+        # Workers run long jobs outside the web request. They are never retried automatically: a failed run
+        # is recorded on its Run, and a second invoke would start a duplicate.
+        self.run_worker = self.make_function(
+            "run-worker", "jobmecloud.handlers.run_worker.handler", timeout=900, memory=1024,
+            env={"TZ": timezone}, no_retries=True,
+        )
+        self.docs_worker = self.make_function(
+            "docs-worker", "jobmecloud.handlers.docs_worker.handler", timeout=300, memory=1024,
+            env={"TZ": timezone}, no_retries=True,
+        )
+
         # API Gateway puts its own host in the request (CloudFront does not pass the viewer's host through).
         self.api_function = self.make_function(
             "api", "jobmecloud.handlers.api.handler", timeout=30, memory=512,
-            env={"JOBMECLOUD_ALLOWED_HOSTS": f"*.execute-api.{self.region}.amazonaws.com"},
+            env={
+                "JOBMECLOUD_ALLOWED_HOSTS": f"*.execute-api.{self.region}.amazonaws.com",
+                "JOBMECLOUD_RUN_FUNCTION": self.run_worker.function_name,
+                "JOBMECLOUD_DOCS_FUNCTION": self.docs_worker.function_name,
+            },
         )
+        self.run_worker.grant_invoke(self.api_function)
+        self.docs_worker.grant_invoke(self.api_function)
         self.edge = Edge(
             self, "Edge", api_function=self.api_function, site_bucket=self.site_bucket,
             user_pool=self.auth.user_pool, client=self.auth.spa_client, region=self.region,
@@ -93,7 +110,7 @@ class JobMeCloudStack(Stack):
         )
 
     def make_function(self, name: str, handler: str, *, timeout: int, memory: int,
-                      env: dict[str, str] | None = None) -> lambda_.Function:
+                      env: dict[str, str] | None = None, no_retries: bool = False) -> lambda_.Function:
         """A Lambda with the shared settings: arm64, Python 3.12, 14-day logs, access to the data stores."""
         pascal = "".join(part.capitalize() for part in name.split("-"))
         fn = lambda_.Function(
@@ -120,4 +137,6 @@ class JobMeCloudStack(Stack):
             actions=["ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"],
             resources=[self.format_arn(service="ssm", resource="parameter", resource_name="jobmecloud/*")]))
         self.data_bucket.grant_read_write(fn)
+        if no_retries:
+            fn.configure_async_invoke(retry_attempts=0)
         return fn

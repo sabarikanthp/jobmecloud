@@ -1,12 +1,11 @@
 import logging
-import threading
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from jobmecloud.agents.jobscout.pipeline import RunSetupError, execute_run, preflight, start_run
+from jobmecloud.agents.jobscout.pipeline import RunSetupError, abandon_run, preflight, start_run
 from jobmecloud.db.models import Job, Run, RunJob
 from jobmecloud.jobs.runlock import IN_PROGRESS_COPY, RunInProgressError, run_lock_held
 from jobmecloud.jobs.tracking import allowed_next
@@ -74,14 +73,6 @@ def _run_out(run: Run, engine) -> RunOut:
     )
 
 
-def _background(*args) -> None:
-    try:
-        execute_run(*args)
-    except Exception:
-        # execute_run already recorded the failure on the Run.
-        log.exception("Background run failed")
-
-
 @router.post("/runs", status_code=202)
 def run_now(request: Request) -> dict:
     state = request.app.state
@@ -94,13 +85,12 @@ def run_now(request: Request) -> dict:
         run_id = start_run(state.engine, "manual", now)
     except RunInProgressError:
         raise HTTPException(409, IN_PROGRESS_COPY)
-    thread = threading.Thread(
-        target=_background,
-        args=(state.data_dir, state.engine, run_id, state.run_deps, now),
-        daemon=True,
-    )
-    state.run_thread = thread
-    thread.start()
+    try:
+        state.dispatcher.start_run(run_id)
+    except Exception:
+        log.exception("Could not start the run worker")
+        abandon_run(state.engine, run_id, "The run could not be started. Please try again.", now)
+        raise HTTPException(502, "The run could not be started. Please try again.") from None
     return {"run_id": run_id}
 
 

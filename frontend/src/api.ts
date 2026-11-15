@@ -396,14 +396,52 @@ export interface DocsResult {
   folder: string
 }
 
-export const makeDocs = (id: number, feedback?: string | null) =>
-  request<DocsResult>(`/jobs/${id}/docs`, { method: 'POST', body: JSON.stringify({ feedback: feedback ? feedback : null }) })
+export interface DocsStatus {
+  status: 'generating' | 'ready' | 'error' | null
+  note: string | null
+  folder: string | null
+  error: string | null
+}
+
+export const DOCS_POLL_MS = 3000
+const DOCS_GIVE_UP_MS = 6 * 60 * 1000 // a bit over the documents worker's own 5-minute limit
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// In AWS the documents are written by a background worker: start it, then wait for it to finish.
+// Locally the server writes them during the request and answers with the result straight away.
+export async function makeDocs(id: number, feedback?: string | null): Promise<DocsResult> {
+  const first = await request<DocsResult | { status: string }>(`/jobs/${id}/docs`, {
+    method: 'POST',
+    body: JSON.stringify({ feedback: feedback ? feedback : null }),
+  })
+  if (!('status' in first)) return first
+  const deadline = Date.now() + DOCS_GIVE_UP_MS
+  while (Date.now() < deadline) {
+    await sleep(DOCS_POLL_MS)
+    const s = await request<DocsStatus>(`/jobs/${id}/docs/status`)
+    if (s.status === 'ready') return { note: s.note, folder: s.folder ?? '' }
+    if (s.status === 'error') throw new Error(s.error || 'Writing the documents failed.')
+  }
+  throw new Error('Writing the documents is taking longer than expected. Check back in a few minutes.')
+}
 
 export const useAsIs = (id: number, resumeId: string) =>
   request<DocsResult>(`/jobs/${id}/as-is`, { method: 'POST', body: JSON.stringify({ resume_id: resumeId }) })
 
-export const openDoc = (id: number, what: 'resume' | 'cover_letter' | 'folder') =>
-  request<void>(`/jobs/${id}/open`, { method: 'POST', body: JSON.stringify({ what }) })
+// In AWS the files live in S3, so "open" means download through a short-lived link.
+export async function openDoc(id: number, what: 'resume' | 'cover_letter' | 'folder'): Promise<void> {
+  if (authEnabled()) {
+    if (what === 'folder') return
+    const { url } = await request<{ url: string; filename: string }>(`/jobs/${id}/download`, {
+      method: 'POST',
+      body: JSON.stringify({ what }),
+    })
+    window.open(url, '_blank')
+    return
+  }
+  await request<void>(`/jobs/${id}/open`, { method: 'POST', body: JSON.stringify({ what }) })
+}
 
 // ---- Tracking ----
 
