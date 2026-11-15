@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """CDK entry point: `cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com`."""
 
+import os
+
 import aws_cdk as cdk
 
 from infra.jobmecloud_stack import JobMeCloudStack
@@ -14,5 +16,6 @@ JobMeCloudStack(
     owner_email=owner_email,
     sender_email=app.node.try_get_context("sender_email") or owner_email,
     lambda_dist=app.node.try_get_context("lambda_dist") or "dist/lambda",
+    env=cdk.Environment(account=os.environ.get("CDK_DEFAULT_ACCOUNT"), region=os.environ.get("CDK_DEFAULT_REGION")),
 )
 app.synth()

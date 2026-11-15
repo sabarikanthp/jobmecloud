@@ -1,6 +1,8 @@
 from aws_cdk import assertions
 from aws_cdk import aws_lambda as lambda_
 
+from conftest import ENV
+
 
 def test_data_bucket_private_and_versioned(template):
     template.has_resource_properties("AWS::S3::Bucket", {
@@ -41,7 +43,7 @@ def test_functions_are_arm64_python312_with_14_day_logs(stack, lambda_dist):
 
     from infra.jobmecloud_stack import JobMeCloudStack
     s = JobMeCloudStack(App(), "F", owner_email="o@example.com", sender_email="n@example.com",
-                        lambda_dist=lambda_dist)
+                        lambda_dist=lambda_dist, env=ENV)
     s.make_function("api", "jobmecloud.handlers.api.handler", timeout=30, memory=512)
     t = assertions.Template.from_stack(s)
     t.has_resource_properties("AWS::Lambda::Function", {
@@ -55,7 +57,7 @@ def test_function_is_wired_to_data_stores(lambda_dist):
 
     from infra.jobmecloud_stack import JobMeCloudStack
     s = JobMeCloudStack(App(), "W", owner_email="o@example.com", sender_email="n@example.com",
-                        lambda_dist=lambda_dist)
+                        lambda_dist=lambda_dist, env=ENV)
     s.make_function("api", "jobmecloud.handlers.api.handler", timeout=30, memory=512)
     t = assertions.Template.from_stack(s)
     env = list(t.find_resources("AWS::Lambda::Function").values())[0]["Properties"]["Environment"]["Variables"]

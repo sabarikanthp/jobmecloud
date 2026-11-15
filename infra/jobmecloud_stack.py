@@ -15,6 +15,8 @@ from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
+from infra.auth import Auth
+
 WORKSPACE_PREFIX = "workspace"
 BUDGET_USD = 5
 
@@ -48,6 +50,8 @@ class JobMeCloudStack(Stack):
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[lambda_.Architecture.ARM_64],
         )
+
+        self.auth = Auth(self, "Auth", sender_email=sender_email, account=self.account, region=self.region)
 
         budgets.CfnBudget(
             self, "MonthlyBudget",
