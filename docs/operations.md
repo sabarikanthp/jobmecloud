@@ -6,7 +6,7 @@
 git pull
 uv sync
 uv run python scripts/build_lambdas.py
-uv run cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com -c timezone=America/Chicago
+cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com -c timezone=America/Chicago
 uv run python scripts/migrate_db.py
 (cd frontend && npm install && npm run build)
 uv run python scripts/publish_site.py
@@ -45,7 +45,7 @@ See [account-recovery.md](account-recovery.md).
 1. Download anything you want to keep (documents from the data bucket).
 2. In the **Aurora DSQL** console, open your cluster and turn off **deletion protection**.
 3. In the **Cognito** console, open your user pool and turn off **deletion protection**.
-4. Run `uv run cdk destroy`.
+4. Run `cdk destroy`.
 5. Delete the two **retained S3 buckets** (names start with the stack name): empty each one first, including all versions (**Show versions**, select all, delete), then delete the bucket.
 6. Delete your saved API keys: Parameter Store, parameters starting `/jobmecloud/`.
 7. Delete the Cognito domain prefix and the SES verified identity if you no longer want them.

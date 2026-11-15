@@ -1,5 +1,5 @@
 {
-  "app": "python -m infra.app",
+  "app": "uv run python -m infra.app",
   "context": {
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true

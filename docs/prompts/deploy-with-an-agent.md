@@ -40,9 +40,9 @@ THE STEPS (in order; confirm each with a check)
 6. Region check. Confirm Aurora DSQL, Cognito and SES are available in my region (docs/deploy.md step 6). If not, choose another.
 7. Project setup. Run `uv sync` and `cd frontend && npm install`. Run the project's tests (`uv run pytest -q`) and report the result.
 8. SES. Walk me through verifying my email address as an SES identity in my region (this one is mine). Check it with `aws ses get-identity-verification-attributes` or the SES v2 equivalent and confirm the status is Success/Verified.
-9. CDK bootstrap. Explain what it creates, then run `uv run cdk bootstrap`.
-10. Build and preview. Run `uv run python scripts/build_lambdas.py`. Then run `uv run cdk diff -c owner_email=<me> -c sender_email=<me> -c timezone=<my IANA time zone>` and explain in plain words what will be created and what it costs (docs/costs.md). Ask for my go-ahead.
-11. Deploy. Run `uv run cdk deploy ...` with the same -c values. Show progress in plain words. After it finishes, read the stack outputs and check the Budgets email confirmation (this one is mine).
+9. CDK bootstrap. Explain what it creates, then run `cdk bootstrap`.
+10. Build and preview. Run `uv run python scripts/build_lambdas.py`. Then run `cdk diff -c owner_email=<me> -c sender_email=<me> -c timezone=<my IANA time zone>` and explain in plain words what will be created and what it costs (docs/costs.md). Ask for my go-ahead.
+11. Deploy. Run `cdk deploy ...` with the same -c values. Show progress in plain words. After it finishes, read the stack outputs and check the Budgets email confirmation (this one is mine).
 12. Database. Run `uv run python scripts/migrate_db.py`. Then, only if I agree, run the DSQL integration test: `JOBMECLOUD_DB_URL=dsql://<DatabaseEndpoint output> uv run pytest -m dsql -q`. Report exactly what passed or failed. This is the first real test of the database layer, so report every error in full.
 13. Sign-in account. Run `uv run python scripts/create_owner.py --email <me>`. Tell me to look for the temporary-password email (check spam).
 14. Website. Run `cd frontend && npm run build`, then `uv run python scripts/publish_site.py`. Give me the site address.

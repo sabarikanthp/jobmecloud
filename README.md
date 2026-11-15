@@ -24,7 +24,7 @@ In short (the first-time steps, such as verifying your email with SES and `cdk b
 
 ```
 uv run python scripts/build_lambdas.py
-uv run cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com
+cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com
 uv run python scripts/migrate_db.py
 uv run python scripts/create_owner.py --email you@example.com
 (cd frontend && npm install && npm run build)
