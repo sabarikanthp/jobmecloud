@@ -7,7 +7,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 GUIDES = ["deploy", "costs", "security", "operations", "account-recovery", "troubleshooting"]
-DOC_FILES = [ROOT / "README.md", ROOT / "CONTRIBUTING.md", *(ROOT / "docs" / f"{g}.md" for g in GUIDES)]
+AGENT_PROMPT = ROOT / "docs" / "prompts" / "deploy-with-an-agent.md"
+DOC_FILES = [ROOT / "README.md", ROOT / "CONTRIBUTING.md", AGENT_PROMPT, *(ROOT / "docs" / f"{g}.md" for g in GUIDES)]
 
 
 def text(path: Path) -> str:
@@ -122,3 +123,11 @@ def test_no_personal_data_in_repo():
             assert ident not in lowered, f"{name} contains {ident!r}, which identifies whoever ran the tests"
         for found in account_id.findall(body):
             assert found == "123456789012", f"possible AWS account id {found} in {name}"
+
+
+def test_agent_prompt_is_linked_and_keeps_secrets_out_of_chat():
+    assert "docs/prompts/deploy-with-an-agent.md" in text(ROOT / "README.md")
+    prompt = text(AGENT_PROMPT)
+    for needle in ["NEVER ask me to paste a password", "root user", "FRICTION LOG", "one step at a time",
+                   "This one is yours", "migrate_db", "create_owner", "publish_site"]:
+        assert needle.lower() in prompt.lower(), needle
