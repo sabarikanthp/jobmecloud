@@ -71,7 +71,7 @@ class JobMeCloudStack(Stack):
 
         # API Gateway puts its own host in the request (CloudFront does not pass the viewer's host through).
         self.api_function = self.make_function(
-            "api", "jobmecloud.handlers.api.handler", timeout=30, memory=512,
+            "api", "jobmecloud.handlers.api.handler", timeout=30, memory=512, secrets_write=True,
             env={
                 "JOBMECLOUD_ALLOWED_HOSTS": f"*.execute-api.{self.region}.amazonaws.com",
                 "JOBMECLOUD_RUN_FUNCTION": self.run_worker.function_name,
@@ -132,7 +132,8 @@ class JobMeCloudStack(Stack):
         ))
 
     def make_function(self, name: str, handler: str, *, timeout: int, memory: int,
-                      env: dict[str, str] | None = None, no_retries: bool = False) -> lambda_.Function:
+                      env: dict[str, str] | None = None, no_retries: bool = False,
+                      secrets_write: bool = False) -> lambda_.Function:
         """A Lambda with the shared settings: arm64, Python 3.12, 14-day logs, access to the data stores."""
         pascal = "".join(part.capitalize() for part in name.split("-"))
         fn = lambda_.Function(
@@ -156,7 +157,8 @@ class JobMeCloudStack(Stack):
         fn.add_to_role_policy(iam.PolicyStatement(
             actions=["dsql:DbConnectAdmin"], resources=[self.dsql_cluster.attr_resource_arn]))
         fn.add_to_role_policy(iam.PolicyStatement(
-            actions=["ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"],
+            # Only the API saves or removes keys (Settings); the workers just read them.
+            actions=["ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"] if secrets_write else ["ssm:GetParameter"],
             resources=[self.format_arn(service="ssm", resource="parameter", resource_name="jobmecloud/*")]))
         self.data_bucket.grant_read_write(fn)
         if no_retries:

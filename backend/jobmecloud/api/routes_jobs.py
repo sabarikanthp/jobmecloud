@@ -1,7 +1,7 @@
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -33,6 +33,8 @@ MISSING_JOB_COPY = "No job with that id"
 NO_DOCS_COPY = "No documents for this job yet."
 FEEDBACK_COPY = "Please keep the feedback under 2,000 characters."
 MAX_FEEDBACK = 2000
+DOCS_TIMEOUT = timedelta(minutes=6)  # a little over the docs worker's own 5-minute limit
+DOCS_TIMED_OUT_COPY = "Writing the documents timed out. Please try again."
 
 
 class DocsIn(BaseModel):
@@ -95,6 +97,7 @@ def _start_docs(state, job_id: int, feedback: str | None) -> JSONResponse:
     with Session(state.engine) as session:
         job = session.get(Job, job_id)
         job.docs_status, job.docs_error = "generating", None
+        job.docs_started_at = datetime.now(timezone.utc)
         session.add(job)
         session.commit()
     try:
@@ -133,7 +136,21 @@ def docs_status(job_id: int, request: Request) -> dict:
         job = session.get(Job, job_id)
         if job is None:
             raise HTTPException(404, MISSING_JOB_COPY)
+        if job.docs_status == "generating" and _docs_timed_out(job):
+            # The worker is gone (timeout, crash): say so instead of leaving the page waiting forever.
+            job.docs_status, job.docs_error = "error", DOCS_TIMED_OUT_COPY
+            session.add(job)
+            session.commit()
         return {"status": job.docs_status, "note": job.docs_note, "folder": job.docs_folder, "error": job.docs_error}
+
+
+def _docs_timed_out(job: Job) -> bool:
+    started = job.docs_started_at
+    if started is None:
+        return True
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - started > DOCS_TIMEOUT
 
 
 def _as_is(state, job_id: int, resume_id: str) -> dict:

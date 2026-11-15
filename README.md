@@ -18,7 +18,7 @@ JobMeCloud is the cloud version of JobMe, which runs on one computer. The search
 
 You need an AWS account, about an hour for the first time, and a laptop with a terminal. Follow **[docs/deploy.md](docs/deploy.md)**, which starts from creating the AWS account.
 
-In short:
+In short (the first-time steps, such as verifying your email with SES and `cdk bootstrap`, are in the guide):
 
 ```
 uv run python scripts/build_lambdas.py

@@ -116,7 +116,7 @@ The `api` Lambda runs FastAPI through an ASGI adapter (Lambda Web Adapter or Man
 ### Data
 - Aurora DSQL, one cluster, IAM authentication (short-lived token per connection, generated with boto3). Connection lifetime is under the 1-hour DSQL limit, which fits Lambda.
 - Code changes required (all verified against the DSQL docs):
-  1. Primary keys: DSQL identity columns must be `bigint` with an explicit `CACHE`, so SERIAL-style autoincrement is replaced for the Postgres dialect (`BigInteger` with `Identity(cache=...)`, or app-generated IDs; builder's call).
+  1. Primary keys: DSQL identity columns must be `bigint` with an explicit `CACHE` of 1 or at least 65536 (we use 1), so SERIAL-style autoincrement is replaced for the Postgres dialect (`BigInteger` with `Identity(cache=...)`, or app-generated IDs; builder's call).
   2. `add_missing_columns` in `db/session.py` uses SQLite `PRAGMA table_info`. Rewrite it dialect-aware. On DSQL `ADD COLUMN` takes a type only (no DEFAULT or NOT NULL in the same statement), so a default must be applied in a second step or handled in the model.
   3. Optimistic concurrency: wrap write transactions in a retry for serialization failures.
   4. A transaction may modify at most 3,000 rows. The spreadsheet, tracker and text importers must commit in batches.

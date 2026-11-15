@@ -29,6 +29,11 @@ Use the same `-c` values you deployed with. `cdk deploy` shows a summary of what
 | The schedule | EventBridge, **Scheduler**, schedules named `jobmecloud-run-HHMM` (change them in Settings, not here) |
 | Spending | Billing and Cost Management, Budgets and Cost Explorer ([costs.md](costs.md)) |
 
+## Limits to know about
+
+- **One person, one browser tab at a time.** Settings and files are kept in S3 and shared between Lambdas. If two things change the same file at the same moment (for example, saving Settings while a run finishes), the last one saved wins. This is fine for one person and is not designed for teams.
+- **Only one run or documents job at a time.** A second request is told "A run is already in progress."
+
 ## Lost password or authenticator
 
 See [account-recovery.md](account-recovery.md).

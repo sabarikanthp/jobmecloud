@@ -14,6 +14,7 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 MISSING_COPY = "No run with that id"
+STOPPED_UNEXPECTEDLY_COPY = "This run stopped unexpectedly. Please start a new one."
 
 
 class RunOut(BaseModel):
@@ -64,11 +65,13 @@ class RunJobOut(BaseModel):
 
 def _run_out(run: Run, engine) -> RunOut:
     running = run.finished_at is None and run_lock_held(engine, datetime.now(timezone.utc))
+    orphaned = run.finished_at is None and not running  # nothing holds the lock: the worker is gone
     return RunOut(
         id=run.id, trigger=run.trigger, started_at=run.started_at,
-        finished_at=run.finished_at, stage=run.stage, running=running,
+        finished_at=run.finished_at, stage=None if orphaned else run.stage, running=running,
         found=run.found, new=run.new, excluded=run.excluded, matched=run.matched,
-        prepared=run.prepared, errors=[str(e) for e in run.errors or []],
+        prepared=run.prepared,
+        errors=[str(e) for e in run.errors or []] + ([STOPPED_UNEXPECTEDLY_COPY] if orphaned else []),
         est_cost=run.est_cost,
     )
 

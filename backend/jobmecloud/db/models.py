@@ -40,6 +40,7 @@ class Job(SQLModel, table=True):
     docs_note: str | None = None  # the page note shown on Today
     docs_error: str | None = None  # last Make docs failure, friendly text; cleared on success
     docs_status: str | None = None  # generating / ready / error: set while a docs worker writes the files
+    docs_started_at: datetime | None = None  # when the current docs job was handed to a worker
     repost_of_id: int | None = fk("job.id", optional=True)
     notes: str | None = None
 

@@ -104,3 +104,12 @@ def test_files_another_lambda_added_are_not_deleted_by_a_push(s3, tmp_path):
     w.push()
     keys = [o["Key"] for o in s3.list_objects_v2(Bucket=BUCKET, Prefix="ws/")["Contents"]]
     assert "ws/applications/Acme/resume.docx" in keys
+
+
+def test_pull_refuses_keys_that_would_escape_the_folder(s3, tmp_path):
+    put(s3, "ws/../outside.txt", b"nope")
+    put(s3, "ws/ok.txt", b"fine")
+    inner = tmp_path / "inner"
+    Workspace(BUCKET, "ws", inner).pull()
+    assert (inner / "ok.txt").exists()
+    assert not (tmp_path / "outside.txt").exists()

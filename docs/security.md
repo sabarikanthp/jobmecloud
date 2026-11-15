@@ -18,7 +18,8 @@ JobMeCloud is built for one person. Your data lives in **your own AWS account**;
 - Sign-in requires your **password plus a second step** (authenticator app or email code). A password alone never produces a token.
 - Every API route is checked by API Gateway's JWT authorizer before any code runs.
 - The data bucket and the website bucket cannot be read directly: the website is served only through CloudFront.
-- Lambdas have the smallest permissions that work. The scheduler can start only the search worker. The API can manage only schedules whose names begin `jobmecloud-run-`.
+- Permissions are narrowed where it is practical. The scheduler can start only the search worker. The API can manage only schedules whose names begin `jobmecloud-run-`. Only the API can save or delete your API keys; the workers can only read them.
+- Honest limit: every function connects to the database as the cluster's **admin role**, because the app creates and updates its own tables. A narrower database role is planned for the read-only external API.
 
 ## What leaves your account
 
