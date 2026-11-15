@@ -1,3 +1,4 @@
+import getpass
 import re
 import subprocess
 from pathlib import Path
@@ -75,13 +76,38 @@ def test_operations_guide_covers_update_backup_and_uninstall():
         assert needle in ops, needle
 
 
-def test_no_personal_data_in_repo():
+def _git(*args: str) -> str:
     try:
-        files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
+        return ""
+
+
+PUBLIC_MAIL = {"gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com", "proton.me",
+               "protonmail.com", "users.noreply.github.com", "example.com"}
+
+
+def _own_identifiers() -> set[str]:
+    """Who is running the tests: their git identity and login name, read at run time so nothing is hard-coded."""
+    found: set[str] = set()
+    name = _git("config", "--global", "user.name")
+    email = _git("config", "--global", "user.email")
+    found.update(word for word in re.split(r"\W+", name) if len(word) >= 4)
+    if "@" in email:
+        local, domain = email.lower().split("@", 1)
+        found.add(local)
+        if domain not in PUBLIC_MAIL:
+            found.add(domain.split(".")[0])
+    found.add(getpass.getuser())
+    return {f.lower() for f in found if len(f) >= 4}
+
+
+def test_no_personal_data_in_repo():
+    files = _git("ls-files").split()
+    if not files:
         pytest.skip("not a git checkout")
     skipped = {"LICENSE", "uv.lock", "frontend/package-lock.json"}
-    personal = re.compile(r"jordan|tailspin|jdoe|example", re.IGNORECASE)
+    identifiers = _own_identifiers()
     account_id = re.compile(r"(?<![0-9])[0-9]{12}(?![0-9])")
     for name in files:
         path = ROOT / name
@@ -91,6 +117,8 @@ def test_no_personal_data_in_repo():
             body = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        assert not personal.search(body), f"personal data in {name}"
+        lowered = body.lower()
+        for ident in identifiers:
+            assert ident not in lowered, f"{name} contains {ident!r}, which identifies whoever ran the tests"
         for found in account_id.findall(body):
             assert found == "123456789012", f"possible AWS account id {found} in {name}"
