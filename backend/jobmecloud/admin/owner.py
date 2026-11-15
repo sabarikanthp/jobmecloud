@@ -2,9 +2,15 @@
 
 import boto3
 
+from jobmecloud.admin.stack import stack_outputs
+
 
 class OwnerNotFound(Exception):
     pass
+
+
+def pool_id_from_stack(stack_name: str, cfn=None) -> str:
+    return stack_outputs(stack_name, cfn)["UserPoolId"]
 
 
 def _client(client):
