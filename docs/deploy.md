@@ -29,12 +29,13 @@ If you would rather use a classic IAM user: create a user with the `Administrato
 
 | Tool | Why | Install |
 |---|---|---|
+| Git | Gets the code | <https://git-scm.com/downloads> |
 | AWS CLI v2 | Talks to your account | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html> |
 | uv | Installs Python 3.12 and the project's packages | <https://docs.astral.sh/uv/getting-started/installation/> |
-| Node.js (current LTS) | Builds the website and runs the AWS CDK | <https://nodejs.org/> |
+| Node.js 22 or 24 (LTS) | Builds the website and runs the AWS CDK. A newer Node works, but the CDK prints a warning that it has not been tested with it | <https://nodejs.org/> |
 | AWS CDK | Creates the AWS resources | `npm install -g aws-cdk` |
 
-Check them: `aws --version` (must say `aws-cli/2`), `uv --version`, `node --version`, `cdk --version`.
+Check them: `git --version`, `aws --version` (must say `aws-cli/2`), `uv --version`, `node --version`, `cdk --version`. You do not install Python yourself: `uv` fetches Python 3.12 and every package the project needs.
 
 **Windows notes.** If `aws --version` says `aws-cli/1`, an old copy is earlier on your PATH. Open a new terminal, or call the new one by its full path (`C:\Program Files\Amazon\AWSCLIV2\aws.exe`). If the installer fails with error 1618, another install is running: wait for it or restart. In **Git Bash**, an argument that starts with `/` (such as a Parameter Store name like `/jobmecloud/...`) is rewritten into a Windows path; run `export MSYS_NO_PATHCONV=1` first, or use PowerShell.
 
@@ -54,7 +55,7 @@ Check it worked: `aws sts get-caller-identity` should print your account number.
 
 ## 6. Choose a region
 
-Pick one region and use it for everything: set `AWS_REGION` (for example `us-east-1`) and `AWS_DEFAULT_REGION` to the same value. JobMeCloud uses Aurora DSQL, Cognito, SES, CloudFront and Lambda, so the region must offer all of them. `us-east-1` (N. Virginia) is a safe default. Check the list at <https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/> if you want another.
+Pick one region and use it for everything: set `AWS_REGION` (for example `us-east-1`) and `AWS_DEFAULT_REGION` to the same value. JobMeCloud uses Aurora DSQL, Cognito, SES, CloudFront and Lambda, so the region must offer all of them. `us-east-1` (N. Virginia) is a safe default. Check the list at <https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/> if you want another. If you plan to use [emailed reports](email-ingest.md), SES must also be able to *receive* email in that region (`us-east-1` can), and a CloudFront certificate for your own address must be requested in `us-east-1` whatever region you deploy to.
 
 ## 7. Get the code
 
@@ -92,6 +93,7 @@ cdk deploy -c owner_email=you@example.com -c sender_email=you@example.com -c tim
 
 - `owner_email` gets the spending alerts. `sender_email` is the verified SES address. They can be the same.
 - `timezone` is your own time zone as an IANA name (for example `Europe/London`, `Asia/Kolkata`). Searches rotate employers by weekday, and your schedule runs in this zone. The default is `UTC`.
+- Optional settings, each explained in its own section or guide: `site_domain` and `certificate_arn` (your own web address, see below), and `inbound_address`, `inbound_sender` and `inbound_daily_limit` (runs driven by an emailed report, see [email-ingest.md](email-ingest.md)). If you set any of them, set them again on every later deploy.
 - The first deploy takes about ten minutes. CDK lists what it will create and asks you to confirm. When it finishes it prints outputs, including `SiteUrl`, `UserPoolId` and `DatabaseEndpoint`. The scripts below read them for you.
 - AWS Budgets emails you to confirm the alert address. Click that link.
 
@@ -137,7 +139,7 @@ Follow the setup guide in the app. In the **Connect an AI** step choose Anthropi
 
 Searches need a web-search source. With Anthropic the built-in web search is used. With other providers, add a Tavily or Brave search key in Settings.
 
-Set the **spending limit per run** in Settings (the default is $2) so one run can never cost more than you expect.
+Set the **spending limit per run** in Settings (the default is $2). Know what a web-search run costs before you schedule one: the AI provider bills the web search by tokens, and one run can cost $1 to $2 even though it reads few postings, because the search results are large. The limit is checked between AI calls, so a single search call can finish a little over it. Lower **Searches per run** (for example to 6) to cut the cost, or skip web search entirely and let [an emailed report](email-ingest.md) drive your runs, which costs cents.
 
 ## Optional: use your own address
 

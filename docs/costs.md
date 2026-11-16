@@ -28,12 +28,21 @@ Nothing here has a fixed monthly fee: there is no server, no NAT gateway, no dat
 
 ## The AI provider (the real cost)
 
-You pay your AI provider directly for the model calls that read postings, score them and write documents. A search run reads up to 40 postings. The cost depends on the model you pick and how many runs you do. The Today screen shows roughly what each run cost.
+You pay your AI provider directly for the model calls that read postings, score them and write documents. The cost depends on the model you pick and how you start runs. The Today screen shows roughly what each run cost (the app's own estimate from the token counts and the price table in Settings; your provider's usage page has the real figure).
+
+**What it cost in practice** (measured on a real account, with Anthropic models):
+
+| How the run started | Typical cost |
+|---|---|
+| AI web search (the model searches the web and reads pages) | **$0.70 to $2.10 per run.** Almost all of it is input tokens: the search results are large and are re-read at each step inside one provider call |
+| An emailed report (another tool did the searching; JobMeCloud reads, checks and scores each role, and writes documents for the best) | **About $0.07** for a report naming one role |
+
+A subscription to a chat assistant does not help here: it is a separate product from the API key JobMeCloud uses, which is billed per token. If you already have a tool that does your searching on a flat plan, [emailed reports](email-ingest.md) let you keep that and use JobMeCloud for everything after the search.
 
 Control it in **Settings**:
 
-- **Spending limit per run** (default $2): a run stops spending when it reaches the limit.
-- **Searches per run** (default 20) and **applications per run** (default 10).
+- **Spending limit per run** (default $2): a run stops spending when it reaches the limit. It is checked between AI calls, so one web-search call can overshoot it (one run was measured at $2.06 against a $2 limit).
+- **Searches per run** (default 20; around 6 costs far less) and **applications per run** (default 10).
 - Choose cheaper models for the reading and scoring steps.
 
 Estimate your monthly total as: runs per month x the cost shown on Today.
@@ -50,7 +59,7 @@ If you use [email-ingest.md](email-ingest.md), SES charges a very small amount p
 
 ## Things that would add cost
 
-- Using a custom domain (about $0.50 a month for a Route 53 zone). The default `*.cloudfront.net` address is free.
+- Using your own web address. The certificate and the CloudFront hostname are free, and so are Cloudflare's DNS records. A domain name costs roughly a dozen dollars a year if you do not already own one, and hosting its DNS in Route 53 is about $0.50 a month. The default `*.cloudfront.net` address is free.
 - Turning on SMS two-step verification. It is not offered: SMS is billed per message and needs extra setup.
 - Moving SES out of the sandbox and sending a lot of email.
 - Leaving the stack deployed after you stop using it is nearly free, but not exactly zero (stored files, logs).
