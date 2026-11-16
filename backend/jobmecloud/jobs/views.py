@@ -57,6 +57,7 @@ def _row(job: Job, next_due: date | None) -> dict:
         "flags": list(job.flags or []), "apply_url": job.apply_url,
         "linkedin": is_linkedin(job.apply_url), "docs_ready": bool(job.docs_folder),
         "has_open_followup": next_due is not None, "next_followup_due": iso(next_due),
+        "allowed_next": allowed_next(job),  # so the list can offer status changes without opening the job
     }
 
 

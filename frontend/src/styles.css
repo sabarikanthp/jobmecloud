@@ -112,6 +112,12 @@ button.danger { background: var(--panel); border-color: var(--danger); color: va
 button.danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
 button.link { border: 0; background: none; color: var(--accent); }
 button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
+.row-status { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.row-status select { font: inherit; font-size: 0.8rem; padding: 2px 4px; max-width: 11rem; }
+.row-reason { display: inline-flex; align-items: center; gap: 6px; }
+.row-error { color: var(--danger); font-size: 0.8rem; }
+a.link { color: var(--accent); text-decoration: none; }
+a.link:hover { text-decoration: underline; }
 .badge {
   display: inline-block;
   background: #e3f4ea;
