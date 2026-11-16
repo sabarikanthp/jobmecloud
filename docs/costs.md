@@ -37,7 +37,7 @@ You pay your AI provider directly for the model calls that read postings, score 
 | AI web search (the model searches the web and reads pages) | **$0.70 to $2.10 per run.** Almost all of it is input tokens: the search results are large and are re-read at each step inside one provider call |
 | An emailed report (another tool did the searching; JobMeCloud reads, checks and scores each role, and writes documents for the best) | **About $0.07** for a report naming one role |
 
-A subscription to a chat assistant does not help here: it is a separate product from the API key JobMeCloud uses, which is billed per token. If you already have a tool that does your searching on a flat plan, [emailed reports](email-ingest.md) let you keep that and use JobMeCloud for everything after the search.
+A subscription to a chat assistant does not help here: it is a separate product from the API key JobMeCloud uses, which is billed per token. If you already have a tool that does your searching on a flat plan, such as a ChatGPT scheduled task, [emailed reports](email-ingest.md) let you keep that and use JobMeCloud for everything after the search: the task searches and emails its report, and JobMeCloud reads, scores and writes documents.
 
 Control it in **Settings**:
 
