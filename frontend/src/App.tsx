@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getSetup } from './api.ts'
+import { followUpBadge, useFollowUpCounts } from './followUps.ts'
 import { authEnabled, logout } from './auth.ts'
 import { NavProvider, PAGES, useNav } from './nav.tsx'
 import Dashboard from './pages/Dashboard.tsx'
@@ -22,6 +23,7 @@ function Shell() {
   const { page, go } = useNav()
   const [finished, setFinished] = useState<boolean | null>(null)
   const [error, setError] = useState('')
+  const badge = followUpBadge(useFollowUpCounts())
 
   useEffect(() => {
     getSetup()
@@ -45,6 +47,11 @@ function Shell() {
             onClick={() => go(p)}
           >
             {p}
+            {p === 'Follow-ups' && badge && (
+              <span className={badge.overdue ? 'nav-count overdue' : 'nav-count'} role="img" aria-label={badge.label}>
+                {badge.text}
+              </span>
+            )}
           </button>
         ))}
         {authEnabled() && (
