@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 USER_AGENT = "Mozilla/5.0 (compatible; JobMe/0.1)"
 TIMEOUT = 20
+CHECK_FETCH_TIMEOUT = 10  # a person is waiting on a pasted link, so give up sooner than a run does
 MAX_RESULTS_LIMIT = 20
 MAX_DOWNLOAD_BYTES = 2_000_000
 MAX_REDIRECTS = 5
@@ -220,11 +221,12 @@ def fetch_page(
     client: httpx.Client | None = None,
     max_chars: int = 50_000,
     resolve: Callable[[str], list[str]] = _resolve,
+    timeout: float = TIMEOUT,
 ) -> FetchResult:
     try:
         if client is not None:
             return _fetch_with(client, url, max_chars, resolve)
-        with httpx.Client(timeout=TIMEOUT) as own:
+        with httpx.Client(timeout=timeout) as own:
             return _fetch_with(own, url, max_chars, resolve)
     except (httpx.HTTPError, httpx.InvalidURL):
         return FetchResult(url, 0, "")

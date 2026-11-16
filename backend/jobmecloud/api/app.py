@@ -12,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import jobmecloud
 from jobmecloud.api import (
+    routes_check,
     routes_connections,
     routes_contacts,
     routes_dashboard,
@@ -40,6 +41,7 @@ from jobmecloud.db.migrate import migrate
 from jobmecloud.db.retry import ConflictRetryMiddleware
 from jobmecloud.jobs.dispatch import LambdaDispatcher, ThreadDispatcher
 from jobmecloud.llm.factory import build_provider
+from jobmecloud.llm.search import CHECK_FETCH_TIMEOUT, fetch_page
 from jobmecloud.llm.types import Provider
 from jobmecloud.storage.sync import WorkspaceSyncMiddleware
 from jobmecloud.storage.workspace import Workspace
@@ -83,6 +85,7 @@ def create_app(
     )
     app.state.open_path = routes_jobs.default_open_path
     app.state.today = date.today
+    app.state.check_fetch = lambda url: fetch_page(url, timeout=CHECK_FETCH_TIMEOUT)
 
     try:
         settings = load_settings(data_dir)
@@ -118,6 +121,7 @@ def create_app(
     app.include_router(routes_inbound.router, prefix="/api")
     app.include_router(routes_schedule.router, prefix="/api")
     app.include_router(routes_resumes.router, prefix="/api")
+    app.include_router(routes_check.router, prefix="/api")  # before the {id} routes, so "check" is not read as an id
     app.include_router(routes_joblist.router, prefix="/api")
     app.include_router(routes_jobs.router, prefix="/api")
     app.include_router(routes_followups.router, prefix="/api")

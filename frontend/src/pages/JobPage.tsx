@@ -11,7 +11,7 @@ import JobInterviews from './JobInterviews.tsx'
 import { KeyDates, Notes, Timeline } from './JobSections.tsx'
 import { Chips } from './JobParts.tsx'
 import { errorText, formatPay, matchText } from './jobFormat.ts'
-import type { DocsRunner } from './docsTypes.ts'
+import { useDocsRunner } from './useDocsRunner.ts'
 
 export default function JobPage({ id }: { id: number }) {
   const { go } = useNav()
@@ -19,7 +19,6 @@ export default function JobPage({ id }: { id: number }) {
   const [error, setError] = useState('')
   const [resumes, setResumes] = useState<ResumeList | null>(null)
   const [skipReasons, setSkipReasons] = useState<string[]>([])
-  const [busyId, setBusyId] = useState<number | null>(null)
 
   const reload = useCallback(async () => {
     try {
@@ -45,24 +44,9 @@ export default function JobPage({ id }: { id: number }) {
       .catch(() => setSkipReasons([]))
   }, [])
 
-  const runDocs: DocsRunner = async (jobId, action) => {
-    setBusyId(jobId)
-    try {
-      try {
-        await action()
-      } catch (e) {
-        return { error: errorText(e), stale: false }
-      }
-      try {
-        setJob(await getJob(id))
-      } catch {
-        return { error: null, stale: true }
-      }
-      return { error: null, stale: false }
-    } finally {
-      setBusyId(null)
-    }
-  }
+  const { busyId, runDocs } = useDocsRunner(async () => {
+    setJob(await getJob(id))
+  })
 
   const back = (
     <p>
