@@ -12,7 +12,7 @@ MB = 1024 * 1024
 ZIPPED_LIMIT = 50 * MB  # Lambda's limit for a directly uploaded zip
 UNZIPPED_LIMIT = 250 * MB  # code plus layers, unzipped
 # zip name (also the CDK function name) -> handler module
-HANDLERS = {"api": "api", "run-worker": "run_worker", "docs-worker": "docs_worker"}
+HANDLERS = {"api": "api", "run-worker": "run_worker", "docs-worker": "docs_worker", "ingest": "ingest"}
 # Already in the Lambda Python runtime, so they are left out to keep the layer small.
 RUNTIME_PACKAGES = ("boto3", "botocore", "s3transfer", "jmespath")
 TARGET_PLATFORM = "aarch64-manylinux_2_28"  # arm64 Lambdas run Amazon Linux 2023 (glibc 2.34)

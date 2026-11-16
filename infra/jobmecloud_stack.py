@@ -17,6 +17,7 @@ from constructs import Construct
 
 from infra.auth import Auth
 from infra.edge import Edge
+from infra.inbound import Inbound
 
 WORKSPACE_PREFIX = "workspace"
 BUDGET_USD = 5
@@ -36,12 +37,15 @@ def _private_bucket(scope: Construct, id: str, *, versioned: bool) -> s3.Bucket:
 class JobMeCloudStack(Stack):
     def __init__(self, scope: Construct, id: str, *, owner_email: str, sender_email: str,
                  lambda_dist: str, timezone: str = "UTC", site_domain: str | None = None,
-                 certificate_arn: str | None = None, **kwargs) -> None:
+                 certificate_arn: str | None = None, inbound_address: str | None = None,
+                 inbound_sender: str | None = None, inbound_daily_limit: int = 5, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
         if bool(site_domain) != bool(certificate_arn):
             raise ValueError("Give both site_domain and certificate_arn, or neither.")
         if certificate_arn and ":acm:us-east-1:" not in certificate_arn:
             raise ValueError("CloudFront only accepts certificates from us-east-1; request the certificate there.")
+        if bool(inbound_address) != bool(inbound_sender):
+            raise ValueError("Give both inbound_address and inbound_sender, or neither.")
         self.owner_email = owner_email
         self.sender_email = sender_email
         self.lambda_dist = Path(lambda_dist)
@@ -73,6 +77,13 @@ class JobMeCloudStack(Stack):
         # EventBridge Scheduler starts the run-worker on the owner's chosen days and times, using this role.
         self.scheduler_role = iam.Role(self, "SchedulerRole", assumed_by=iam.ServicePrincipal("scheduler.amazonaws.com"))
         self.run_worker.grant_invoke(self.scheduler_role)
+
+        # Optional: a daily report emailed to inbound_address starts a run (docs/email-ingest.md).
+        self.inbound = None
+        if inbound_address:
+            self.inbound = Inbound(
+                self, "Inbound", make_function=self.make_function, run_worker=self.run_worker,
+                address=inbound_address, sender=inbound_sender, daily_limit=inbound_daily_limit)
 
         # API Gateway puts its own host in the request (CloudFront does not pass the viewer's host through).
         self.api_function = self.make_function(
@@ -106,6 +117,8 @@ class JobMeCloudStack(Stack):
             "DatabaseEndpoint": self.dsql_cluster.attr_endpoint,
         }.items():
             CfnOutput(self, name, value=value)
+        if self.inbound:
+            CfnOutput(self, "MailBucketName", value=self.inbound.bucket.bucket_name)
 
         budgets.CfnBudget(
             self, "MonthlyBudget",
@@ -140,7 +153,7 @@ class JobMeCloudStack(Stack):
 
     def make_function(self, name: str, handler: str, *, timeout: int, memory: int,
                       env: dict[str, str] | None = None, no_retries: bool = False,
-                      secrets_write: bool = False) -> lambda_.Function:
+                      secrets_write: bool = False, secrets: bool = True, data_access: bool = True) -> lambda_.Function:
         """A Lambda with the shared settings: arm64, Python 3.12, 14-day logs, access to the data stores."""
         pascal = "".join(part.capitalize() for part in name.split("-"))
         fn = lambda_.Function(
@@ -155,19 +168,21 @@ class JobMeCloudStack(Stack):
             log_group=logs.LogGroup(self, f"{pascal}Logs", retention=logs.RetentionDays.TWO_WEEKS,
                                     removal_policy=RemovalPolicy.DESTROY),
             environment={
-                "JOBMECLOUD_BUCKET": self.data_bucket.bucket_name,
-                "JOBMECLOUD_PREFIX": WORKSPACE_PREFIX,
+                **({"JOBMECLOUD_BUCKET": self.data_bucket.bucket_name, "JOBMECLOUD_PREFIX": WORKSPACE_PREFIX}
+                   if data_access else {}),
                 "JOBMECLOUD_DB_URL": f"dsql://{self.dsql_cluster.attr_endpoint}",
                 **(env or {}),
             },
         )
         fn.add_to_role_policy(iam.PolicyStatement(
             actions=["dsql:DbConnectAdmin"], resources=[self.dsql_cluster.attr_resource_arn]))
-        fn.add_to_role_policy(iam.PolicyStatement(
-            # Only the API saves or removes keys (Settings); the workers just read them.
-            actions=["ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"] if secrets_write else ["ssm:GetParameter"],
-            resources=[self.format_arn(service="ssm", resource="parameter", resource_name="jobmecloud/*")]))
-        self.data_bucket.grant_read_write(fn)
+        if secrets:
+            fn.add_to_role_policy(iam.PolicyStatement(
+                # Only the API saves or removes keys (Settings); the workers just read them.
+                actions=["ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"] if secrets_write else ["ssm:GetParameter"],
+                resources=[self.format_arn(service="ssm", resource="parameter", resource_name="jobmecloud/*")]))
+        if data_access:
+            self.data_bucket.grant_read_write(fn)
         if no_retries:
             fn.configure_async_invoke(retry_attempts=0)
         return fn

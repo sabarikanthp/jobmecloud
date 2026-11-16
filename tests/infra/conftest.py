@@ -14,7 +14,7 @@ ENV = Environment(account="123456789012", region="us-east-1")
 def lambda_dist(tmp_path_factory):
     """Stand-in build output so the stack can synthesize without running the real build."""
     dist = tmp_path_factory.mktemp("dist")
-    for name in ("layer", "api", "run-worker", "docs-worker", "ext-api", "presignup"):
+    for name in ("layer", "api", "run-worker", "docs-worker", "ingest", "ext-api", "presignup"):
         with zipfile.ZipFile(dist / f"{name}.zip", "w") as z:
             z.writestr("placeholder.py", "")
     return str(dist)

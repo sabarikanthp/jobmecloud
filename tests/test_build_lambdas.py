@@ -36,15 +36,17 @@ def test_layer_excludes_boto3_and_tests(tmp_path):
 
 def test_each_handler_zip_has_entry_module(tmp_path):
     zips = build.build_code(tmp_path, ROOT / "backend")
-    assert sorted(z.name for z in zips) == ["api.zip", "docs-worker.zip", "run-worker.zip"]
+    assert sorted(z.name for z in zips) == ["api.zip", "docs-worker.zip", "ingest.zip", "run-worker.zip"]
     assert "jobmecloud/handlers/api.py" in names(tmp_path / "api.zip")
     assert "jobmecloud/handlers/run_worker.py" in names(tmp_path / "run-worker.zip")
     assert "jobmecloud/handlers/docs_worker.py" in names(tmp_path / "docs-worker.zip")
+    assert "jobmecloud/handlers/ingest.py" in names(tmp_path / "ingest.zip")
+    assert "jobmecloud/inbound/parse.py" in names(tmp_path / "ingest.zip")
     assert not any("__pycache__" in f for f in names(tmp_path / "api.zip"))
 
 
 def test_handler_names_match_what_the_stack_expects():
-    assert set(build.HANDLERS) == {"api", "run-worker", "docs-worker"}
+    assert set(build.HANDLERS) == {"api", "run-worker", "docs-worker", "ingest"}
 
 
 def test_size_limit_enforced(tmp_path):
@@ -60,4 +62,4 @@ def test_size_limit_enforced(tmp_path):
 
 def test_build_all_writes_the_files_the_stack_loads(tmp_path):
     out = build.build_all(tmp_path, root=ROOT, install=fake_install)
-    assert sorted(p.name for p in out) == ["api.zip", "docs-worker.zip", "layer.zip", "run-worker.zip"]
+    assert sorted(p.name for p in out) == ["api.zip", "docs-worker.zip", "ingest.zip", "layer.zip", "run-worker.zip"]
