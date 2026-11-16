@@ -54,8 +54,10 @@ NO_SEARCH_KEY_COPY = "Add your search key in Settings > AI connection."
 STAGE_SEARCHING = "Searching for jobs"
 STAGE_READING = "Reading postings ({i} of {n})"
 STAGE_RECHECK = "Checking older jobs"
+STAGE_EMAIL = "Reading the emailed report"
 
 STEPS = ("search", "extract", "liveness", "score", "tailor")
+EMAIL_STEPS = ("extract", "liveness", "score", "tailor")  # a run fed by an email does no searching
 
 
 class RunLostError(Exception):
@@ -107,6 +109,11 @@ class _Context:
     cost_cap_noted: bool = False
     ai_errors_seen: set[str] = field(default_factory=set)
     stopped: bool = False
+    origin: str = "scout"  # "email" when the candidates came from an emailed report
+
+
+# Supplies a run's candidates instead of the search agent (used by runs started from an email).
+CandidateSource = Callable[["_Context"], list[Candidate]]
 
 
 @dataclass
@@ -128,19 +135,21 @@ class _Indexes:
 # ---------------------------------------------------------------- entry points
 
 
-def preflight(data_dir: Path, deps: RunDeps) -> None:
+def preflight(data_dir: Path, deps: RunDeps, *, needs_search: bool = True) -> None:
     settings = load_settings(data_dir)
-    models = _resolve_models(settings, deps)
+    models = _resolve_models(settings, deps, STEPS if needs_search else EMAIL_STEPS)
     if not load_search(data_dir).target_roles:
         raise RunSetupError(NO_ROLES_COPY)
-    _resolve_search(settings, models["search"][0], deps)
+    if needs_search:
+        _resolve_search(settings, models["search"][0], deps)
 
 
-def start_run(engine: Engine, trigger: Literal["manual", "schedule"], now: datetime) -> int:
+def start_run(engine: Engine, trigger: Literal["manual", "schedule", "email"], now: datetime) -> int:
     owner = acquire_run_lock(engine, now)
     try:
         with Session(engine) as session:
-            run = Run(trigger=trigger, started_at=now, stage=STAGE_SEARCHING, lock_owner=owner)
+            run = Run(trigger=trigger, started_at=now, stage=STAGE_EMAIL if trigger == "email" else STAGE_SEARCHING,
+                      lock_owner=owner)
             session.add(run)
             session.commit()
             return run.id
@@ -160,7 +169,7 @@ def abandon_run(engine: Engine, run_id: int, message: str, now: datetime) -> Non
     release_run_lock(engine, owner)
 
 
-def record_failed_run(engine: Engine, trigger: Literal["manual", "schedule"], now: datetime, message: str) -> int:
+def record_failed_run(engine: Engine, trigger: Literal["manual", "schedule", "email"], now: datetime, message: str) -> int:
     """A run that could not even start still leaves a finished Run, so Today can show what went wrong."""
     with Session(engine) as session:
         run = Run(trigger=trigger, started_at=now, finished_at=now, errors=[message])
@@ -169,7 +178,8 @@ def record_failed_run(engine: Engine, trigger: Literal["manual", "schedule"], no
         return run.id
 
 
-def execute_run(data_dir: Path, engine: Engine, run_id: int, deps: RunDeps, now: datetime) -> Run:
+def execute_run(data_dir: Path, engine: Engine, run_id: int, deps: RunDeps, now: datetime,
+                source: CandidateSource | None = None) -> Run:
     ctx: _Context | None = None
     fatal: str | None = None
     with Session(engine) as session:
@@ -187,17 +197,24 @@ def execute_run(data_dir: Path, engine: Engine, run_id: int, deps: RunDeps, now:
                 settings=settings,
                 profile=load_search(data_dir),
                 resume=load_resume(data_dir),
-                models=_resolve_models(settings, deps),
+                models=_resolve_models(settings, deps, STEPS if source is None else EMAIL_STEPS),
                 costs=CostTracker(settings.prices, settings.caps.max_spend_per_run_usd),
+                origin="scout" if source is None else "email",
             )
-            candidates = _search(ctx)
+            if source is None:
+                candidates = _search(ctx)
+            else:
+                candidates = source(ctx)
+                ctx.found = len(candidates)
+                _save_progress(ctx)
             _still_mine(beat)
             indexes = _load_indexes(ctx)
             _read_candidates(ctx, candidates, indexes)
             _still_mine(beat)
             _prepare_docs(ctx)
             _still_mine(beat)
-            _recheck_older_jobs(ctx)
+            if source is None:  # an email run's cost stays predictable: it does not re-check older jobs
+                _recheck_older_jobs(ctx)
     except Exception as e:
         fatal = str(e) if isinstance(e, (RunSetupError, RunLostError)) else friendly_message(e)
         raise
@@ -226,9 +243,9 @@ def run_jobscout(
 # ---------------------------------------------------------------- setup helpers
 
 
-def _resolve_models(settings: Settings, deps: RunDeps) -> dict[str, tuple[Provider, str]]:
+def _resolve_models(settings: Settings, deps: RunDeps, steps: tuple[str, ...] = STEPS) -> dict[str, tuple[Provider, str]]:
     try:
-        return {step: provider_for_step(settings, step, deps.provider_builder) for step in STEPS}
+        return {step: provider_for_step(settings, step, deps.provider_builder) for step in steps}
     except StepNotConfiguredError as e:
         raise RunSetupError(str(e)) from e
 
@@ -390,6 +407,13 @@ def _read_new(ctx: _Context, c: Candidate, indexes: _Indexes) -> None:
     _save_new_job(ctx, job, outcome, indexes, c.url)
 
 
+def _report_note(c: Candidate) -> str | None:
+    """What an emailed report said about this role, kept on the job so the person can see why it was imported."""
+    if not (c.verdict or c.note):
+        return None
+    return " ".join(part for part in (f"From the emailed report: {c.verdict}." if c.verdict else "", c.note or "") if part)
+
+
 def _job_from_posting(ctx: _Context, posting: Posting, c: Candidate, state: str) -> Job:
     return Job(
         employer=posting.employer,
@@ -404,7 +428,8 @@ def _job_from_posting(ctx: _Context, posting: Posting, c: Candidate, state: str)
         apply_url=posting.apply_url,
         source=_host(c.url),
         description=posting.description,
-        origin="scout",
+        origin=ctx.origin,
+        notes=_report_note(c),
         first_seen_at=ctx.now,
         last_checked_at=ctx.now,
         liveness=state,
