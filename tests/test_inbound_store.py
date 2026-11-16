@@ -56,3 +56,30 @@ def test_started_today_counts_only_started_and_done_on_todays_local_date(engine)
     add("inbox/5", store.WAITING, NOW - timedelta(hours=1))
     add("inbox/6", store.DONE, NOW - timedelta(days=1))
     assert store.started_today(engine, NOW) == 2
+
+
+def test_claim_succeeds_once_and_a_second_claim_is_refused(engine):
+    email_id = store.record_received(engine, "inbox/abc", None, NOW)
+    assert store.claim(engine, email_id, (store.RECEIVED,), NOW) is True
+    assert store.claim(engine, email_id, (store.RECEIVED,), NOW) is False
+    assert store.get_by_key(engine, "inbox/abc").status == store.PROCESSING
+
+
+def test_a_stale_claim_can_be_taken_over_but_a_fresh_one_cannot(engine):
+    email_id = store.record_received(engine, "inbox/abc", None, NOW)
+    store.claim(engine, email_id, (store.RECEIVED,), NOW)
+    assert store.claim(engine, email_id, (store.RECEIVED,), NOW + timedelta(minutes=1)) is False
+    assert store.claim(engine, email_id, (store.RECEIVED,), NOW + timedelta(minutes=20)) is True
+
+
+def test_claim_only_takes_an_email_in_an_allowed_status(engine):
+    email_id = store.record_received(engine, "inbox/abc", None, NOW)
+    store.set_status(engine, email_id, store.DONE)
+    assert store.claim(engine, email_id, (store.RECEIVED,), NOW) is False
+    assert store.claim(engine, email_id, (store.DONE,), NOW) is True
+
+
+def test_set_status_can_fill_in_the_sender(engine):
+    email_id = store.record_received(engine, "inbox/abc", None, NOW)
+    store.set_status(engine, email_id, store.REJECTED, sender="sender@example.com")
+    assert store.get_by_key(engine, "inbox/abc").sender == "sender@example.com"

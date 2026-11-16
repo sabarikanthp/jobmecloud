@@ -81,3 +81,11 @@ def test_recipients_come_from_to_cc_and_the_received_header():
     e = parse_email(make_email(to="Someone <a@example.com>", cc="b@example.com",
                                extra_headers=[("Received", "from mail.example.com by smtp for reports@mail.example.com; Mon")]))
     assert {"a@example.com", "b@example.com", "reports@mail.example.com"} <= set(e.recipients)
+
+
+def test_unknown_charset_is_decoded_with_replacement_instead_of_raising():
+    raw = (b"From: Sender <sender@example.com>\r\nTo: reports@mail.example.com\r\nSubject: s\r\n"
+           b"Content-Type: text/plain; charset=x-nonsense-9\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
+           b"hello caf\xe9 https://jobs.example.com/a\r\n")
+    e = parse_email(raw)
+    assert "hello" in e.text and e.links == ["https://jobs.example.com/a"]

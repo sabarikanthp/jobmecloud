@@ -173,3 +173,19 @@ def test_email_run_without_a_recorded_row_still_works(data_dir, engine, monkeypa
     put_email(monkeypatch)
     run = email_run(engine, monkeypatch, FakeProvider(replies=[roles({}), extract_json(), score_json(90)]), record=False)
     assert run.found == 1 and store.get_by_key(engine, EMAIL_KEY) is None
+
+
+def test_a_report_with_nothing_recommended_finishes_with_a_clear_note(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    put_email(monkeypatch)
+    run = email_run(engine, monkeypatch, FakeProvider(replies=[roles({"verdict": "applied"}, {"verdict": "not_new", "url": "https://a.example/2"})]))
+    assert run.found == 0 and run.finished_at is not None
+    assert any("2 roles" in e and "none were" in e for e in run.errors)
+    assert store.get_by_key(engine, EMAIL_KEY).status == store.DONE
+
+
+def test_an_empty_report_says_it_named_no_roles(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    put_email(monkeypatch)
+    run = email_run(engine, monkeypatch, FakeProvider(replies=[roles()]))
+    assert run.found == 0 and any("no roles" in e for e in run.errors)

@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import and_, or_, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
@@ -9,8 +10,9 @@ from sqlmodel import Session, select
 from jobmecloud.db.models import InboundEmail
 from jobmecloud.db.retry import retry_on_conflict
 
-RECEIVED, STARTED, REJECTED, SKIPPED, WAITING, DONE, FAILED = (
-    "received", "started", "rejected", "skipped", "waiting", "done", "failed")
+RECEIVED, PROCESSING, STARTED, REJECTED, SKIPPED, WAITING, DONE, FAILED = (
+    "received", "processing", "started", "rejected", "skipped", "waiting", "done", "failed")
+STALE_CLAIM_SECONDS = 900  # longer than the ingest function can run, so only a crashed invocation goes stale
 
 
 def get_by_key(engine: Engine, s3_key: str) -> InboundEmail | None:
@@ -38,16 +40,36 @@ def record_received(engine: Engine, s3_key: str, sender: str | None, now: dateti
 
 
 @retry_on_conflict()
-def set_status(engine: Engine, email_id: int, status: str, *, run_id: int | None = None, note: str | None = None) -> None:
+def set_status(engine: Engine, email_id: int, status: str, *, run_id: int | None = None, note: str | None = None,
+               sender: str | None = None) -> None:
     with Session(engine) as session:
         row = session.get(InboundEmail, email_id)
         row.status = status
+        if sender is not None:
+            row.sender = sender
         if run_id is not None:
             row.run_id = run_id
         if note is not None:
             row.note = note
         session.add(row)
         session.commit()
+
+
+@retry_on_conflict()
+def claim(engine: Engine, email_id: int, allowed: tuple[str, ...], now: datetime,
+          stale_after_seconds: int = STALE_CLAIM_SECONDS) -> bool:
+    """Take an email for processing, atomically: True for exactly one of any number of concurrent callers.
+
+    It can be taken from one of the `allowed` statuses, or from `processing` when that claim has gone stale
+    (the invocation that held it crashed).
+    """
+    table = InboundEmail.__table__
+    cutoff = now - timedelta(seconds=stale_after_seconds)
+    stale = and_(table.c.status == PROCESSING, table.c.claimed_at < cutoff)
+    with engine.begin() as conn:
+        result = conn.execute(update(table).where(table.c.id == email_id, or_(table.c.status.in_(allowed), stale))
+                              .values(status=PROCESSING, claimed_at=now))
+        return result.rowcount == 1
 
 
 def started_today(engine: Engine, now: datetime) -> int:

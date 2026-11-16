@@ -389,6 +389,15 @@ export const startRun = () => request<{ run_id: number }>('/runs', { method: 'PO
 
 export const getLatestRun = () => request<RunInfo | null>('/runs/latest')
 
+export interface InboundEmailInfo {
+  received_at: string
+  status: string
+  note: string | null
+  run_id: number | null
+}
+
+export const getInbound = () => request<{ emails: InboundEmailInfo[] }>('/inbound')
+
 export const getRunJobs = (id: number) => request<RunJobRow[]>(`/runs/${id}/jobs`)
 
 export interface DocsResult {

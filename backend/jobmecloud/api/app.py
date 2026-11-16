@@ -18,6 +18,7 @@ from jobmecloud.api import (
     routes_fields,
     routes_followups,
     routes_import,
+    routes_inbound,
     routes_joblist,
     routes_jobs,
     routes_models,
@@ -114,6 +115,7 @@ def create_app(
     app.include_router(routes_watchlist.router, prefix="/api")
     app.include_router(routes_import.router, prefix="/api")
     app.include_router(routes_runs.router, prefix="/api")
+    app.include_router(routes_inbound.router, prefix="/api")
     app.include_router(routes_schedule.router, prefix="/api")
     app.include_router(routes_resumes.router, prefix="/api")
     app.include_router(routes_joblist.router, prefix="/api")

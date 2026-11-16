@@ -52,6 +52,7 @@ EXTRACT_SCHEMA = {
 @dataclass
 class Extraction:
     candidates: list[Candidate] = field(default_factory=list)
+    total_roles: int = 0  # every role the report named, before any were dropped
     dropped_no_link: int = 0
     dropped_by_verdict: int = 0
     dropped_over_cap: int = 0
@@ -82,6 +83,7 @@ def extract_recommended(provider: Provider, model: str, email: ParsedEmail, cost
 
     result = Extraction()
     seen: set[str] = set()
+    result.total_roles = len(data.get("roles", []))
     for item in data.get("roles", []):
         if item.get("verdict") not in KEEP_VERDICTS:
             result.dropped_by_verdict += 1

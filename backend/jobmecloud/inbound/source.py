@@ -38,6 +38,13 @@ def build_email_source(s3, bucket: str | None, key: str) -> CandidateSource:
         if result.dropped_over_cap:
             ctx.errors.append(f"{result.dropped_over_cap} more recommended roles were left out "
                               f"(the limit is {MAX_EMAIL_CANDIDATES} per report).")
+        if not result.candidates:  # say why, so an empty run is never mistaken for a report that did not arrive
+            if result.total_roles == 0:
+                ctx.errors.append("The emailed report named no roles.")
+            else:
+                n = result.total_roles
+                ctx.errors.append(f"The emailed report named {n} {_plural(n, 'role', 'roles')}; none were new "
+                                  "recommendations (already seen, applied, rejected, excluded or without a usable link).")
         return result.candidates
 
     return source

@@ -66,7 +66,7 @@ All of this is created by `cdk deploy` from [`infra/`](../infra). Names are the 
 | CloudFront distribution | `Distribution` | Default behaviour to S3 via OAC, `/api/*` to API Gateway, caching off for the API | One HTTPS address for site and API |
 | Scheduler IAM role | `SchedulerRole` | Can invoke only the run worker | What EventBridge Scheduler assumes |
 | AWS Budget | `MonthlyBudget` | $5 monthly, email at 80% actual and 100% forecast | A spending alert, not a spending stop |
-| *Optional:* mail bucket, SES receipt rule set, ingest function | `Inbound` | Private bucket with 30-day expiry, one rule for one address, 256 MB and 3 minutes | Emailed reports ([email-ingest.md](email-ingest.md)) |
+| *Optional:* mail bucket, SES receipt rule set, ingest function | `Inbound` | Private bucket with 30-day expiry, one rule for one address, 256 MB and 10 minutes | Emailed reports ([email-ingest.md](email-ingest.md)) |
 
 **Created later by the app, not by CDK:**
 

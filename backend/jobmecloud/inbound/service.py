@@ -1,7 +1,8 @@
 """What happens when a report email reaches the mail bucket, up to handing the run to the worker.
 
-Every email ends in a recorded outcome (an InboundEmail row), so nothing is lost silently and a retry of the same
-S3 notification does nothing twice.
+Every email ends in a recorded outcome (an InboundEmail row), so nothing is lost silently, and the row is the
+claim ticket: at most one invocation processes an email at a time, so a repeated or concurrent S3 notification
+does nothing twice.
 """
 
 import time
@@ -18,8 +19,12 @@ from jobmecloud.jobs.dispatch import Dispatcher
 from jobmecloud.jobs.runlock import RunInProgressError
 
 LOCK_POLL_SECONDS = 5
+LOCK_WAIT_SECONDS = 480  # a documents job (up to 5 minutes) or a typical email run finishes inside this
+MAX_RAW_BYTES = 2_000_000  # a report is a few thousand characters; anything this big is not one
 DUPLICATE = "duplicate"
 UNREADABLE_COPY = "The email could not be read from the mail bucket."
+UNPARSEABLE_COPY = "The email could not be read: its contents were not a valid message."
+TOO_LARGE_COPY = "The message is too large."
 LIMIT_COPY = "The daily limit for emailed reports was reached ({n}); this one was not run."
 WAITING_COPY = "A run or documents job was in progress for too long; replay this email later with scripts/reprocess_email.py."
 HANDOFF_COPY = "The run could not be handed to the worker."
@@ -35,31 +40,45 @@ def handle_email(
     config: TrustConfig,
     daily_limit: int,
     now: datetime,
-    lock_wait_seconds: float = 90,
+    lock_wait_seconds: float = LOCK_WAIT_SECONDS,
     sleep: Callable[[float], None] = time.sleep,
     reprocess: tuple[str, ...] = (),
 ) -> str:
     """Process one stored email and return its final status (or "duplicate" when it was already handled).
 
     `reprocess` names finished statuses that may be run again (the replay script passes `waiting` or `failed`).
-    A row still in `received` is always retried: a previous attempt died before deciding anything.
+    A row still in `received` is always retried (a previous attempt died before deciding anything), and a
+    `processing` row whose claim has gone stale is taken over.
     """
     existing = store.get_by_key(engine, key)
-    if existing is not None and existing.status not in (store.RECEIVED, *reprocess):
+    if existing is not None and existing.status not in (store.RECEIVED, store.PROCESSING, *reprocess):
         return DUPLICATE
 
+    # Record it before looking inside: whatever happens next, the email has a row to show for it.
+    email_id = existing.id if existing else store.record_received(engine, key, None, now)
+    if email_id is None or not store.claim(engine, email_id, (store.RECEIVED, *reprocess), now):
+        return DUPLICATE  # another delivery of the same object has it
+
+    try:
+        size = s3.head_object(Bucket=bucket, Key=key)["ContentLength"]
+    except Exception:
+        store.set_status(engine, email_id, store.FAILED, note=UNREADABLE_COPY)
+        return store.FAILED
+    if size > MAX_RAW_BYTES:  # decided before reading, so a stranger cannot make this function load a huge message
+        store.set_status(engine, email_id, store.REJECTED, note=TOO_LARGE_COPY)
+        return store.REJECTED
     try:
         raw = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     except Exception:
-        email_id = existing.id if existing else store.record_received(engine, key, None, now)
-        if email_id is not None:
-            store.set_status(engine, email_id, store.FAILED, note=UNREADABLE_COPY)
+        store.set_status(engine, email_id, store.FAILED, note=UNREADABLE_COPY)
         return store.FAILED
-
-    email = parse_email(raw)
-    email_id = existing.id if existing else store.record_received(engine, key, email.sender or None, now)
-    if email_id is None:
-        return DUPLICATE  # another delivery of the same object recorded it first
+    try:
+        email = parse_email(raw)
+    except Exception:
+        store.set_status(engine, email_id, store.FAILED, note=UNPARSEABLE_COPY)
+        return store.FAILED
+    if email.sender:
+        store.set_status(engine, email_id, store.PROCESSING, sender=email.sender)
 
     reason = check_trust(email, config)
     if reason:

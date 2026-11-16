@@ -13,37 +13,39 @@ This is optional. JobMeCloud works without it.
 ## What you need
 
 - A **domain you control**, where you can add DNS records (Cloudflare, Route 53 or any other provider). Use a subdomain such as `mail.example.com` so your normal mail is untouched.
-- A tool that can email you a job report on a schedule, from **one fixed address that signs its mail with DKIM** (Gmail and most providers do).
+- A tool that can email you a job report on a schedule, from **one fixed address that only you can send as** and that signs its mail with DKIM (Gmail and most providers do). Do not use a shared notification address that a service sends to all its users: anyone else using that service could then send mail that passes every check.
 - The report should give each role's employer, title and a **direct link to the posting**, with a plain verdict (recommend, consider, strong, or applied, rejected, skipped, excluded, already seen). JobMeCloud reads ordinary prose, so no special format is needed.
 
 ## Set it up
 
-1. **Pick two addresses.** The report address, for example `reports@mail.example.com`, and the one sender address allowed to use it, for example `you@example.net`.
-2. **Verify the subdomain in SES.** In the console (region `us-east-1`, or another region where SES can receive email: check the AWS documentation), open **Amazon SES**, **Identities**, **Create identity**, choose **Domain**, enter `mail.example.com` and keep **Easy DKIM** on. Or run `aws sesv2 create-email-identity --email-identity mail.example.com`.
-3. **Add the DNS records at your provider.**
+1. **Pick two addresses.** The report address (see the next step for its name) and the one sender address allowed to use it, for example `you@example.net`.
+2. **Make the report address hard to guess.** The secrecy of the address is part of the protection, so use an unguessable part, for example `reports-k3x9q2vd@mail.example.com`, and do not publish it.
+3. **Verify the subdomain in SES.** In the console (region `us-east-1`, or another region where SES can receive email: check the AWS documentation), open **Amazon SES**, **Identities**, **Create identity**, choose **Domain**, enter `mail.example.com` and keep **Easy DKIM** on. Or run `aws sesv2 create-email-identity --email-identity mail.example.com`.
+4. **Add the DNS records at your provider.**
    - The three DKIM `CNAME` records SES shows you. On Cloudflare set each to **DNS only** (grey cloud).
    - One `MX` record: name `mail` (so `mail.example.com`), value `inbound-smtp.us-east-1.amazonaws.com` (use your region), priority `10`.
    Wait until SES shows the identity as **Verified**.
-4. **Deploy with two extra settings** (use the same `-c` values as always, plus these):
+5. **Deploy with two extra settings** (use the same `-c` values as always, plus these):
    ```
    uv run python scripts/build_lambdas.py
    cdk deploy -c owner_email=... -c sender_email=... -c inbound_address=reports@mail.example.com -c inbound_sender=you@example.net
    uv run python scripts/migrate_db.py
    ```
    `inbound_daily_limit` (default 5) caps how many emailed reports may start a run per day. If another SES receiving rule set is already active in the region, the deploy stops with a message and changes nothing: add a rule for the report address to that rule set yourself, or deactivate it, and deploy again.
-5. **Send a test email** from the sender address to the report address, with a short report naming one real role and its link. Within a minute `uv run python scripts/reprocess_email.py --list` shows it as `started`, then `done`, and the **Today** screen says "Last report … (from email)".
-6. **Point your report at the address**, then switch off scheduled web search in **Settings** (delete the schedule) so only the email drives runs. **Run now** still works as a manual search.
+6. **Send a test email** from the sender address to the report address, with a short report naming one real role and its link. Within a minute `uv run python scripts/reprocess_email.py --list` shows it as `started`, then `done`, and the **Today** screen says "Last report … (from email)".
+7. **Point your report at the address**, then switch off scheduled web search in **Settings** (delete the schedule) so only the email drives runs. **Run now** still works as a manual search.
 
 ## What it does with each email
 
 1. Checks the message. It must be addressed to your report address, come from your sender address, pass SES's spam and virus checks, and carry a valid DKIM signature for the sender's domain. Anything else is recorded as `rejected` and starts nothing.
-2. Starts a run, unless the daily limit is reached (`skipped`) or another run or documents job holds the lock for more than about 90 seconds (`waiting`).
+2. Starts a run, unless the daily limit is reached (`skipped`) or another run or documents job holds the lock for more than about 8 minutes (`waiting`). If an email is rejected, skipped, waiting or failed, the **Today** screen says so, so a missing report is never a mystery.
 3. Reads the report with one AI call and keeps the roles it recommends. Roles marked already seen, applied, rejected, skipped, excluded or closed are dropped, as are roles with no usable link (these are listed in the run's problems). At most 25 roles per report.
 4. Reads, checks and scores each role like any other run, and writes documents for the ones above your cutoff. Each job keeps the report's verdict and note so you can see why it was imported.
 
 | Status | Meaning |
 |---|---|
-| `received` | Arrived; being looked at |
+| `received` | Arrived; recorded |
+| `processing` | Being checked and started (an interrupted one is picked up again after about 15 minutes) |
 | `started` | A run was started for it |
 | `done` | The run finished |
 | `rejected` | Failed the checks (wrong sender, wrong address, spam, no valid signature) |
@@ -66,7 +68,7 @@ Without `--force` only `waiting` and `failed` emails are replayed. The key is sh
 - Raw emails are kept in a private bucket for 30 days, then deleted.
 - The report text is sent to your AI provider so it can be read.
 - The report is treated as untrusted text. The model only picks out roles; it cannot change settings, send mail or run anything. Links go through the same page fetcher as every other posting.
-- Only your one sender address can start a run, and at most `inbound_daily_limit` runs a day.
+- Only mail that passes every check can start a run: it must come from your one sender address with a valid signature. At most `inbound_daily_limit` runs start a day, and messages over 2 MB are refused without being read. Because the sender address could be known to others, keep the report address secret as described above.
 
 ## If something does not work
 

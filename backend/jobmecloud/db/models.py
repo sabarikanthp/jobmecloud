@@ -158,6 +158,7 @@ class InboundEmail(SQLModel, table=True):
     s3_key: str
     received_at: datetime
     sender: str | None = None
-    status: str  # received / started / rejected / skipped / waiting / done / failed
+    status: str  # received / processing / started / rejected / skipped / waiting / done / failed
     run_id: int | None = fk("run.id", optional=True)
     note: str | None = None
+    claimed_at: datetime | None = None  # when an invocation took it; a stale claim (a crash) can be taken over
