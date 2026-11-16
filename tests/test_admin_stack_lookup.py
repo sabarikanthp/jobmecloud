@@ -40,3 +40,16 @@ def test_missing_stack_says_to_deploy_first():
 def test_create_owner_still_takes_an_explicit_pool_id():
     pool = boto3.client("cognito-idp").create_user_pool(PoolName="x")["UserPool"]["Id"]
     create_owner("o@example.com", pool)
+
+
+def test_data_bucket_is_read_from_the_api_functions_settings():
+    from jobmecloud.admin.stack import data_bucket
+
+    cfn, lam = MagicMock(), MagicMock()
+    cfn.get_paginator.return_value.paginate.return_value = [{"StackResourceSummaries": [
+        {"ResourceType": "AWS::S3::Bucket", "LogicalResourceId": "DataBucket1", "PhysicalResourceId": "nope"},
+        {"ResourceType": "AWS::Lambda::Function", "LogicalResourceId": "ApiFunctionABC", "PhysicalResourceId": "fn-1"},
+    ]}]
+    lam.get_function_configuration.return_value = {"Environment": {"Variables": {"JOBMECLOUD_BUCKET": "the-bucket"}}}
+    assert data_bucket("JobMeCloud", cfn=cfn, lam=lam) == "the-bucket"
+    lam.get_function_configuration.assert_called_once_with(FunctionName="fn-1")

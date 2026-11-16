@@ -137,4 +137,4 @@ Set the **spending limit per run** in Settings (the default is $2) so one run ca
 
 ## You are done
 
-Updating later is covered in [operations.md](operations.md). Questions or fixes are welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).
+Coming from the local JobMe app? Bring your data across with [migrating-from-local.md](migrating-from-local.md). Updating later is covered in [operations.md](operations.md). Questions or fixes are welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).
