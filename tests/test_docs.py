@@ -84,6 +84,10 @@ def _git(*args: str) -> str:
         return ""
 
 
+GENERIC_LOGINS = {"runner", "runneradmin", "root", "admin", "administrator", "user", "ubuntu", "vagrant", "docker",
+                  "build", "builder", "jenkins", "github", "vsts", "azureuser", "default"}  # accounts, not people
+NAMES_THE_MAINTAINER = {".github/CODEOWNERS"}  # its whole purpose is to name the maintainer's GitHub account
+
 PUBLIC_MAIL = {"gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com", "proton.me",
                "protonmail.com", "users.noreply.github.com", "example.com"}
 
@@ -100,14 +104,31 @@ def _own_identifiers() -> set[str]:
         if domain not in PUBLIC_MAIL:
             found.add(domain.split(".")[0])
     found.add(getpass.getuser())
-    return {f.lower() for f in found if len(f) >= 4}
+    return {f.lower() for f in found if len(f) >= 4 and f.lower() not in GENERIC_LOGINS}
+
+
+def test_a_generic_login_name_is_not_treated_as_a_person(monkeypatch):
+    """CI machines and system accounts log in as 'runner', 'root' and the like: ordinary words, not someone's name."""
+    for login in ("runner", "root", "ubuntu", "Administrator"):
+        monkeypatch.setattr(getpass, "getuser", lambda login=login: login)
+        assert login.lower() not in _own_identifiers()
+
+
+def test_a_personal_login_name_is_still_checked(monkeypatch):
+    monkeypatch.setattr(getpass, "getuser", lambda: "jordanexample")
+    assert "jordanexample" in _own_identifiers()
+
+
+def test_codeowners_may_name_the_maintainer_but_nothing_else_may():
+    """CODEOWNERS exists to name the maintainer, so the scan skips that one file and no other."""
+    assert NAMES_THE_MAINTAINER == {".github/CODEOWNERS"}
 
 
 def test_no_personal_data_in_repo():
     files = _git("ls-files").split()
     if not files:
         pytest.skip("not a git checkout")
-    skipped = {"LICENSE", "uv.lock", "frontend/package-lock.json"}
+    skipped = {"LICENSE", "uv.lock", "frontend/package-lock.json"} | NAMES_THE_MAINTAINER
     identifiers = _own_identifiers()
     account_id = re.compile(r"(?<![0-9])[0-9]{12}(?![0-9])")
     for name in files:
