@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 class Dispatcher(Protocol):
     synchronous_docs: bool  # True: "Make docs" finishes inside the request (tests, local use)
 
-    def start_run(self, run_id: int) -> None: ...
+    def start_run(self, run_id: int, email_key: str | None = None) -> None: ...
 
     def start_docs(self, job_id: int, options: dict) -> None: ...
 
@@ -31,15 +31,20 @@ class LambdaDispatcher:
     def __init__(self, client=None, run_function: str | None = None, docs_function: str | None = None):
         self._client = client or boto3.client("lambda")
         self.run_function = run_function or os.environ["JOBMECLOUD_RUN_FUNCTION"]
-        self.docs_function = docs_function or os.environ["JOBMECLOUD_DOCS_FUNCTION"]
+        self.docs_function = docs_function or os.environ.get("JOBMECLOUD_DOCS_FUNCTION")  # the ingest function starts runs only
 
     def _invoke(self, function: str, payload: dict) -> None:
         self._client.invoke(FunctionName=function, InvocationType="Event", Payload=json.dumps(payload).encode())
 
-    def start_run(self, run_id: int) -> None:
-        self._invoke(self.run_function, {"task": "run", "run_id": run_id})
+    def start_run(self, run_id: int, email_key: str | None = None) -> None:
+        payload = {"task": "run", "run_id": run_id}
+        if email_key:
+            payload["email_key"] = email_key  # the run worker takes its candidates from this stored email
+        self._invoke(self.run_function, payload)
 
     def start_docs(self, job_id: int, options: dict) -> None:
+        if not self.docs_function:
+            raise RuntimeError("No docs worker is configured (JOBMECLOUD_DOCS_FUNCTION).")
         self._invoke(self.docs_function, {"task": "docs", "job_id": job_id, "options": options})
 
 
@@ -51,7 +56,7 @@ class ThreadDispatcher:
     def __init__(self, state):
         self.state = state
 
-    def start_run(self, run_id: int) -> None:
+    def start_run(self, run_id: int, email_key: str | None = None) -> None:
         from jobmecloud.agents.jobscout.pipeline import execute_run
 
         state = self.state
