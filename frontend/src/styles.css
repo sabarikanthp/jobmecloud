@@ -325,3 +325,9 @@ label.check { display: inline-flex; align-items: center; gap: 6px; font-weight: 
 .below-table .actions-cell { min-width: 170px; }
 .jobs-table.below-table .flag-list { margin-top: 6px; }
 .jobs-table.below-table .chip { display: block; margin: 0 0 4px; padding: 3px 8px; border-radius: 6px; line-height: 1.35; }
+.check-panel textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.fit-card { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.fit-card h4 { margin: 12px 0 4px; }
+.fit-score strong { font-size: 2rem; }
+.fit-good { color: var(--ok); }
+.fit-low { color: #c0392b; }
