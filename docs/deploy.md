@@ -157,4 +157,4 @@ The infrastructure is written with the AWS CDK in [`infra/`](../infra). CDK turn
 
 ## You are done
 
-Coming from the local JobMe app? Bring your data across with [migrating-from-local.md](migrating-from-local.md). Updating later is covered in [operations.md](operations.md). Questions or fixes are welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).
+Want runs driven by an emailed daily report instead of paid searches? See [email-ingest.md](email-ingest.md). Coming from the local JobMe app? Bring your data across with [migrating-from-local.md](migrating-from-local.md). Updating later is covered in [operations.md](operations.md). Questions or fixes are welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).

@@ -66,6 +66,7 @@ All of this is created by `cdk deploy` from [`infra/`](../infra). Names are the 
 | CloudFront distribution | `Distribution` | Default behaviour to S3 via OAC, `/api/*` to API Gateway, caching off for the API | One HTTPS address for site and API |
 | Scheduler IAM role | `SchedulerRole` | Can invoke only the run worker | What EventBridge Scheduler assumes |
 | AWS Budget | `MonthlyBudget` | $5 monthly, email at 80% actual and 100% forecast | A spending alert, not a spending stop |
+| *Optional:* mail bucket, SES receipt rule set, ingest function | `Inbound` | Private bucket with 30-day expiry, one rule for one address, 256 MB and 3 minutes | Emailed reports ([email-ingest.md](email-ingest.md)) |
 
 **Created later by the app, not by CDK:**
 
@@ -134,6 +135,19 @@ RunWorker: pull workspace -> take the run lock -> search agent -> read, check an
 - The run worker has 15 minutes, the Lambda maximum. It checks the remaining time as it works and **stops starting new jobs when under 90 seconds remain**, then records "Stopped early to stay within the time limit." Whatever was found is saved.
 - Workers are **never retried automatically**. A failed run is written onto its Run row. An automatic retry would start a duplicate run.
 - The **run lock** is a row in DSQL with a heartbeat. A second run is refused, and a run that died frees itself after about ten minutes. It is written without `SAVEPOINT`, which DSQL does not support.
+
+### Emailed reports (optional)
+
+With `inbound_address` and `inbound_sender` set, a daily report emailed to a dedicated address starts a run, instead of the search agent paying for a web crawl:
+
+```
+report email -> SES receiving rule -> raw email in the mail bucket -> ingest Lambda
+  (checks sender, address, spam, DKIM; records it; takes the run lock; creates Run(trigger="email"))
+  -> run worker with the email's key: one AI call picks the recommended roles
+  -> the usual read, dedupe, liveness, rules, score -> documents for matches above the cutoff
+```
+
+Only the source of candidates differs. Everything after it, including the single run lock and the per-run spending cap, is the same code. Every received email gets an `InboundEmail` row (received, started, rejected, skipped, waiting, done, failed), which makes ingestion idempotent and replayable. See [email-ingest.md](email-ingest.md).
 
 ### "Make docs"
 
@@ -223,7 +237,7 @@ uv run python scripts/create_owner.py --email ...
 
 ## 12. Honest weak spots and what is not built
 
-- **Not built yet:** SES digest and reminder emails (SES currently sends only sign-in mail), the tool-using tailoring agent, the read-only external API, Bedrock as a model provider, a custom domain.
+- **Not built yet:** SES digest and reminder emails (outgoing mail is still only sign-in mail), the tool-using tailoring agent, the read-only external API, Bedrock as a model provider.
 - **Not yet proven:** at the time of writing, an AI-powered run on AWS and an unattended scheduled search had not been observed. Sign-in, the database layer, creating a schedule and importing data had each been exercised against real AWS.
 - **Every function uses the database's admin role.** The app creates and updates its own tables. A narrower role is planned for the external API.
 - **Anyone with admin access to the AWS account can read everything.** There is no separate encryption layer.

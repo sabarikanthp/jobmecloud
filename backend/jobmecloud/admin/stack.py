@@ -26,3 +26,18 @@ def data_bucket(stack_name: str, cfn=None, lam=None) -> str:
                 env = lam.get_function_configuration(FunctionName=res["PhysicalResourceId"])["Environment"]["Variables"]
                 return env["JOBMECLOUD_BUCKET"]
     raise LookupError(f"Could not find the API function in stack {stack_name}.")
+
+
+def ingest_settings(stack_name: str, cfn=None, lam=None) -> dict:
+    """What the ingest function was deployed with (the report address, allowed sender, daily limit, run worker)."""
+    cfn = cfn or boto3.client("cloudformation")
+    lam = lam or boto3.client("lambda")
+    for page in cfn.get_paginator("list_stack_resources").paginate(StackName=stack_name):
+        for res in page["StackResourceSummaries"]:
+            if res["ResourceType"] == "AWS::Lambda::Function" and "IngestFunction" in res["LogicalResourceId"]:
+                env = lam.get_function_configuration(FunctionName=res["PhysicalResourceId"])["Environment"]["Variables"]
+                return {"address": env["JOBMECLOUD_INBOUND_ADDRESS"], "sender": env["JOBMECLOUD_INBOUND_SENDER"],
+                        "daily_limit": int(env.get("JOBMECLOUD_INBOUND_DAILY_LIMIT", "5")),
+                        "run_function": env["JOBMECLOUD_RUN_FUNCTION"]}
+    raise LookupError(f"Email reports are not set up in stack {stack_name} (no ingest function). "
+                      "Deploy with inbound_address and inbound_sender first.")
