@@ -6,7 +6,7 @@ from infra.jobmecloud_stack import JobMeCloudStack
 from conftest import ENV
 
 DOMAIN = "jobs.example.com"
-CERT = "arn:aws:acm:us-east-1:123456789012:certificate/11111111-2222-3333-4444-555555555555"
+CERT = "arn:aws:acm:us-east-1:123456789012:certificate/11111111-2222-3333-4444-abcdefabcdef"
 
 
 def build(lambda_dist, **kwargs):
