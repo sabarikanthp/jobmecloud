@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 610" width="1120" height="610" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <title>JobMeCloud architecture</title>
+  <desc>A browser reaches CloudFront. CloudFront serves the site from S3 and forwards /api to API Gateway, which checks the Cognito token and calls the API Lambda. The API Lambda starts the run and docs worker Lambdas. EventBridge Scheduler also starts the run worker. All three Lambdas use Aurora DSQL, the S3 data bucket and Parameter Store. The workers call an AI provider.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #475569; stroke-width: 1.5; }
+      .fn { fill: #e0ecff; stroke: #2f5fb3; stroke-width: 1.5; }
+      .data { fill: #e7f6ec; stroke: #2e7d4f; stroke-width: 1.5; }
+      .ext { fill: #fff1de; stroke: #b86e00; stroke-width: 1.5; }
+      .zone { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.2; stroke-dasharray: 6 4; }
+      .t { fill: #0f172a; font-weight: 600; text-anchor: middle; }
+      .s { fill: #475569; font-size: 11px; text-anchor: middle; }
+      .l { fill: #334155; font-size: 11px; }
+      .line { stroke: #475569; stroke-width: 1.5; fill: none; marker-end: url(#a); }
+      .dash { stroke: #475569; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; marker-end: url(#a); }
+    </style>
+  </defs>
+  <rect width="1120" height="610" fill="#ffffff"/>
+
+  <rect class="zone" x="520" y="370" width="580" height="220" rx="10"/>
+  <text class="l" x="534" y="390" font-weight="600">Your data (all in your own AWS account)</text>
+
+  <!-- left to right: the request path -->
+  <rect class="box" x="20" y="250" width="120" height="70" rx="8"/>
+  <text class="t" x="80" y="282">Browser</text><text class="s" x="80" y="300">React site</text>
+
+  <rect class="box" x="180" y="250" width="130" height="70" rx="8"/>
+  <text class="t" x="245" y="282">CloudFront</text><text class="s" x="245" y="300">HTTPS, one address</text>
+
+  <rect class="data" x="180" y="110" width="130" height="70" rx="8"/>
+  <text class="t" x="245" y="142">S3 site bucket</text><text class="s" x="245" y="160">private, via OAC</text>
+
+  <rect class="box" x="350" y="250" width="140" height="70" rx="8"/>
+  <text class="t" x="420" y="282">API Gateway</text><text class="s" x="420" y="300">HTTP API + token check</text>
+
+  <rect class="fn" x="540" y="250" width="140" height="70" rx="8"/>
+  <text class="t" x="610" y="282">API Lambda</text><text class="s" x="610" y="300">FastAPI, 512 MB, 30 s</text>
+
+  <rect class="box" x="350" y="410" width="140" height="70" rx="8"/>
+  <text class="t" x="420" y="442">Cognito</text><text class="s" x="420" y="460">sign-in + required MFA</text>
+
+  <rect class="box" x="350" y="520" width="140" height="60" rx="8"/>
+  <text class="t" x="420" y="548">SES</text><text class="s" x="420" y="565">sign-in and MFA email</text>
+
+  <!-- workers -->
+  <rect class="box" x="540" y="100" width="140" height="60" rx="8"/>
+  <text class="t" x="610" y="128">EventBridge Scheduler</text><text class="s" x="610" y="145">jobmecloud-run-HHMM</text>
+
+  <rect class="fn" x="740" y="100" width="150" height="70" rx="8"/>
+  <text class="t" x="815" y="132">Run worker</text><text class="s" x="815" y="150">search agent, 1 GB, 15 min</text>
+
+  <rect class="fn" x="740" y="200" width="150" height="70" rx="8"/>
+  <text class="t" x="815" y="232">Docs worker</text><text class="s" x="815" y="250">resume + letter, 1 GB, 5 min</text>
+
+  <rect class="ext" x="950" y="100" width="150" height="170" rx="8"/>
+  <text class="t" x="1025" y="170">AI provider</text><text class="s" x="1025" y="190">and web search</text>
+  <text class="s" x="1025" y="212">your API key,</text><text class="s" x="1025" y="227">outside AWS</text>
+
+  <!-- data stores -->
+  <rect class="data" x="540" y="410" width="160" height="80" rx="8"/>
+  <text class="t" x="620" y="440">Aurora DSQL</text><text class="s" x="620" y="460">jobs, history, contacts</text><text class="s" x="620" y="475">IAM sign-in, no password</text>
+
+  <rect class="data" x="720" y="410" width="160" height="80" rx="8"/>
+  <text class="t" x="800" y="440">S3 data bucket</text><text class="s" x="800" y="460">profile, settings, logs,</text><text class="s" x="800" y="475">documents (versioned)</text>
+
+  <rect class="data" x="900" y="410" width="180" height="80" rx="8"/>
+  <text class="t" x="990" y="440">Parameter Store</text><text class="s" x="990" y="460">API keys, encrypted</text><text class="s" x="990" y="475">/jobmecloud/...</text>
+
+  <!-- arrows -->
+  <path class="line" d="M140 285 H180"/>
+  <path class="line" d="M245 250 V180"/>
+  <path class="line" d="M310 285 H350"/>
+  <text class="l" x="312" y="276">/api/*</text>
+  <path class="line" d="M490 285 H540"/>
+  <path class="line" d="M80 320 V445 H350"/>
+  <text class="l" x="92" y="438">sign in (once an hour)</text>
+  <path class="dash" d="M420 410 V320"/>
+  <text class="l" x="428" y="372">token checked</text>
+  <path class="line" d="M420 480 V520"/>
+  <path class="line" d="M680 120 H740" transform="translate(0,0)"/>
+  <path class="line" d="M680 275 L740 245"/>
+  <path class="line" d="M680 262 L740 150"/>
+  <text class="l" x="590" y="205">start (async)</text>
+  <text class="l" x="534" y="560">All three Lambdas use all three stores. The workers also call the AI provider.</text>
+  <path class="line" d="M890 135 H950"/>
+  <path class="line" d="M890 235 L950 215"/>
+  <path class="line" d="M610 320 V410"/>
+  <path class="line" d="M815 270 V410"/>
+</svg>
