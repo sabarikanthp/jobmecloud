@@ -9,6 +9,7 @@ JobMeCloud is the cloud version of JobMe, which runs on one computer. The search
 ## What you get
 
 - Automatic runs even when your computer is off, in either of two ways: scheduled web searches at the days and times you pick, or (usually far cheaper) a daily **emailed report** from another tool, for example a ChatGPT scheduled task that does the searching and emails its result, which JobMeCloud then researches, scores and acts on by itself ([docs/email-ingest.md](docs/email-ingest.md)).
+- **Check a job** you found yourself: paste its text or link, get an AI fit score, then apply, skip or make documents ([docs/check-a-job.md](docs/check-a-job.md)).
 - A score from 0 to 100 for every posting, against your wishes and deal-breakers.
 - A tailored resume and cover letter for the best matches, checked so they never claim anything that is not in your real resume.
 - A tracker for every job, contact and follow-up.
@@ -41,6 +42,7 @@ Optional extras, each documented in the guide: your own web address (`-c site_do
 | [docs/costs.md](docs/costs.md) | What it costs, what is free, and how to set a spending alert |
 | [docs/security.md](docs/security.md) | Where your data lives, who can reach it, and what to do if a key leaks |
 | [docs/architecture-guide.md](docs/architecture-guide.md) | How it works: architecture, AWS resources, data flow, security, cost |
+| [docs/check-a-job.md](docs/check-a-job.md) | Paste a job you found, get the fit, and decide |
 | [docs/email-ingest.md](docs/email-ingest.md) | Optional: start runs from a daily emailed report instead of paying for searches |
 | [docs/migrating-from-local.md](docs/migrating-from-local.md) | Bringing your data over from the local JobMe app |
 | [docs/operations.md](docs/operations.md) | Updating, backups and uninstalling |
