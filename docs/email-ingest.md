@@ -16,6 +16,18 @@ This is optional. JobMeCloud works without it.
 - A tool that can email you a job report on a schedule, from **one fixed address that only you can send as** and that signs its mail with DKIM (Gmail and most providers do). Do not use a shared notification address that a service sends to all its users: anyone else using that service could then send mail that passes every check.
 - The report should give each role's employer, title and a **direct link to the posting**, with a plain verdict (recommend, consider, strong, or applied, rejected, skipped, excluded, already seen). JobMeCloud reads ordinary prose, so no special format is needed.
 
+## Example: let a ChatGPT scheduled task do the searching
+
+This is the setup the feature was built and tested with: a chat assistant runs your daily search on its own flat plan, emails the report to your JobMeCloud address, and JobMeCloud does everything after the search. It needs a ChatGPT plan that offers **scheduled tasks** and a **Gmail connection** (check OpenAI's current documentation: these features and the plans that include them change, and this project is not affiliated with OpenAI). Any other tool that can email a report works the same way.
+
+1. **A sending Gmail account.** Use a dedicated Gmail address that only you control, for example `yourname.jobs@gmail.com`, and connect it to ChatGPT through its Gmail connection. This address is your `inbound_sender`.
+2. **A scheduled task** that holds your search instructions: the roles, places, pay floor, employers to watch, and how to judge fit. Run it daily.
+3. **Tell the task to email the whole report** to your report address from that Gmail account, in the body of the email. A notification email that only holds a link back to ChatGPT is **not** enough: JobMeCloud cannot open a link that needs your login.
+4. **Ask for a report JobMeCloud can read.** For each role, give the employer, the title, the **direct link to the posting** (the employer's own careers page or job board, not a search page or a tracking link), the requisition id and pay if shown, and a plain verdict: recommend, consider or strong, or already seen, applied, rejected, skipped, excluded or closed. Roles marked as already known are dropped, so the report can keep listing them for you to read.
+5. Follow **Set it up** below, send one test email from the sender account, and when it works point the task at the report address and switch off scheduled web search in JobMeCloud's Settings.
+
+From then on: ChatGPT searches and emails you, JobMeCloud receives the email, researches each recommended role itself (reads the posting, checks it is still open, scores it against your profile), and writes a tailored resume and cover letter for the ones above your cutoff. JobMeCloud does not trust ChatGPT's verdict: its own score decides what happens.
+
 ## Set it up
 
 1. **Pick two addresses.** The report address (see the next step for its name) and the one sender address allowed to use it, for example `you@example.net`.

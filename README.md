@@ -8,7 +8,7 @@ JobMeCloud is the cloud version of JobMe, which runs on one computer. The search
 
 ## What you get
 
-- Automatic runs even when your computer is off, in either of two ways: scheduled web searches at the days and times you pick, or (usually far cheaper) a daily **emailed report** from another tool, which JobMeCloud researches, scores and acts on by itself ([docs/email-ingest.md](docs/email-ingest.md)).
+- Automatic runs even when your computer is off, in either of two ways: scheduled web searches at the days and times you pick, or (usually far cheaper) a daily **emailed report** from another tool, for example a ChatGPT scheduled task that does the searching and emails its result, which JobMeCloud then researches, scores and acts on by itself ([docs/email-ingest.md](docs/email-ingest.md)).
 - A score from 0 to 100 for every posting, against your wishes and deal-breakers.
 - A tailored resume and cover letter for the best matches, checked so they never claim anything that is not in your real resume.
 - A tracker for every job, contact and follow-up.
