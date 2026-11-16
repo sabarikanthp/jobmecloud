@@ -107,6 +107,21 @@ def list_followups(request: Request, bucket: Bucket | None = None, job_id: int |
         return [_row(session, fu, today) for fu, _ in rows]
 
 
+@router.get("/followups/counts")
+def counts(request: Request) -> dict:
+    """How many follow-ups need attention: overdue, and due today. Used for the number in the menu."""
+    today = _today(request)
+    tally = {"overdue": 0, "due_today": 0}
+    with Session(request.app.state.engine) as session:
+        for fu in session.exec(select(FollowUp)):
+            where = fu_rules.bucket(fu, today)
+            if where == "overdue":
+                tally["overdue"] += 1
+            elif where == "today":
+                tally["due_today"] += 1
+    return tally
+
+
 @router.post("/followups", status_code=201)
 def create(body: FollowUpIn, request: Request) -> FollowUpRow:
     today = _today(request)
