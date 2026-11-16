@@ -19,6 +19,9 @@ JobMeCloudStack(
     timezone=app.node.try_get_context("timezone") or "UTC",
     site_domain=app.node.try_get_context("site_domain"),
     certificate_arn=app.node.try_get_context("certificate_arn"),
+    inbound_address=app.node.try_get_context("inbound_address"),
+    inbound_sender=app.node.try_get_context("inbound_sender"),
+    inbound_daily_limit=int(app.node.try_get_context("inbound_daily_limit") or 5),
     env=cdk.Environment(account=os.environ.get("CDK_DEFAULT_ACCOUNT"), region=os.environ.get("CDK_DEFAULT_REGION")),
 )
 app.synth()
