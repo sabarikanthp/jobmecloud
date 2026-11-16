@@ -75,13 +75,25 @@ def test_the_same_object_twice_starts_only_one_run(engine, s3):
         assert len(s.exec(select(Run)).all()) == 1
 
 
-def test_untrusted_email_is_recorded_rejected_and_starts_nothing(engine, s3):
+def test_mail_from_anyone_else_is_ignored_and_deleted(engine, s3):
     key = put(s3, sender="stranger@example.net", auth="amazonses.com; dkim=pass header.d=example.net")
+    d = Recording()
+    assert handle(engine, s3, key, d) == store.IGNORED
+    row = store.get_by_key(engine, key)
+    assert row.status == store.IGNORED and row.sender == "stranger@example.net"
+    assert d.started == [] and not run_lock_held(engine, NOW)
+    with pytest.raises(Exception):  # the stranger's message is gone from the mail bucket
+        s3.head_object(Bucket=BUCKET, Key=key)
+
+
+def test_mail_from_the_allowed_sender_that_fails_a_check_is_kept_and_rejected(engine, s3):
+    key = put(s3, auth="amazonses.com; dkim=fail header.d=example.com")  # the right sender, but no valid signature
     d = Recording()
     assert handle(engine, s3, key, d) == store.REJECTED
     row = store.get_by_key(engine, key)
-    assert row.status == store.REJECTED and "sender" in row.note
-    assert d.started == [] and not run_lock_held(engine, NOW)
+    assert row.status == store.REJECTED and "signature" in row.note
+    assert s3.head_object(Bucket=BUCKET, Key=key)  # kept, so a real setup problem can be looked into
+    assert d.started == []
 
 
 def test_over_the_daily_limit_is_recorded_skipped(engine, s3):

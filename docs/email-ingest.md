@@ -37,7 +37,7 @@ This is optional. JobMeCloud works without it.
 
 ## What it does with each email
 
-1. Checks the message. It must be addressed to your report address, come from your sender address, pass SES's spam and virus checks, and carry a valid DKIM signature for the sender's domain. Anything else is recorded as `rejected` and starts nothing.
+1. Checks the message. Mail from **anyone but your sender address** is deleted at once and ignored: it is never shown and never starts anything. Mail from your sender address must also pass SES's spam and virus checks and carry a valid DKIM signature for the sender's domain; if it does not, it is kept and recorded as `rejected`, and the Today screen says so, because that means something about your setup needs attention.
 2. Starts a run, unless the daily limit is reached (`skipped`) or another run or documents job holds the lock for more than about 8 minutes (`waiting`). If an email is rejected, skipped, waiting or failed, the **Today** screen says so, so a missing report is never a mystery.
 3. Reads the report with one AI call and keeps the roles it recommends. Roles marked already seen, applied, rejected, skipped, excluded or closed are dropped, as are roles with no usable link (these are listed in the run's problems). At most 25 roles per report.
 4. Reads, checks and scores each role like any other run, and writes documents for the ones above your cutoff. Each job keeps the report's verdict and note so you can see why it was imported.
@@ -48,7 +48,8 @@ This is optional. JobMeCloud works without it.
 | `processing` | Being checked and started (an interrupted one is picked up again after about 15 minutes) |
 | `started` | A run was started for it |
 | `done` | The run finished |
-| `rejected` | Failed the checks (wrong sender, wrong address, spam, no valid signature) |
+| `rejected` | From your sender, but failed a check (spam, virus, no valid signature); the email is kept |
+| `ignored` | From anyone else, or far too large: deleted immediately, never shown |
 | `skipped` | Over the daily limit |
 | `waiting` | The run lock stayed busy; the email is kept and can be replayed |
 | `failed` | Something went wrong; the note says what |
@@ -65,7 +66,7 @@ Without `--force` only `waiting` and `failed` emails are replayed. The key is sh
 
 ## Privacy and safety
 
-- Raw emails are kept in a private bucket for 30 days, then deleted.
+- Raw reports from your sender are kept in a private bucket for 30 days, then deleted. Mail from anyone else is deleted as soon as it is recognised.
 - The report text is sent to your AI provider so it can be read.
 - The report is treated as untrusted text. The model only picks out roles; it cannot change settings, send mail or run anything. Links go through the same page fetcher as every other posting.
 - Only mail that passes every check can start a run: it must come from your one sender address with a valid signature. At most `inbound_daily_limit` runs start a day, and messages over 2 MB are refused without being read. Because the sender address could be known to others, keep the report address secret as described above.

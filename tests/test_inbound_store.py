@@ -79,6 +79,15 @@ def test_claim_only_takes_an_email_in_an_allowed_status(engine):
     assert store.claim(engine, email_id, (store.DONE,), NOW) is True
 
 
+def test_recent_hides_ignored_mail_unless_asked(engine):
+    keep = store.record_received(engine, "inbound/a", None, NOW)
+    store.set_status(engine, keep, store.DONE)
+    junk = store.record_received(engine, "inbound/b", None, NOW + timedelta(minutes=1))
+    store.set_status(engine, junk, store.IGNORED)
+    assert [r.s3_key for r in store.recent(engine)] == ["inbound/a"]
+    assert [r.s3_key for r in store.recent(engine, include_ignored=True)] == ["inbound/b", "inbound/a"]
+
+
 def test_set_status_can_fill_in_the_sender(engine):
     email_id = store.record_received(engine, "inbox/abc", None, NOW)
     store.set_status(engine, email_id, store.REJECTED, sender="sender@example.com")

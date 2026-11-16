@@ -50,6 +50,7 @@ class Inbound(Construct):
         )
         run_worker.grant_invoke(self.function)
         self.bucket.grant_read(self.function)
+        self.bucket.grant_delete(self.function)  # mail from anyone but the owner's sender is deleted at once
         self.bucket.add_event_notification(
             s3.EventType.OBJECT_CREATED, s3n.LambdaDestination(self.function),
             s3.NotificationKeyFilter(prefix=MAIL_PREFIX))

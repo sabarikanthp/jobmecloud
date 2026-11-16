@@ -110,7 +110,7 @@ The extraction call returns every role with its verdict as the report states it,
 - The message is under a size limit (1 MB of text).
 - Fewer than the daily limit of email runs have started today ("today" in the time zone the stack was deployed with).
 
-A failed check records the email as `rejected` or `skipped` and starts no run. The exact header names SES writes are to be confirmed against a real message during the build.
+Mail from anyone but `inbound_sender`, or over the size limit, is **ignored: deleted at once, recorded as `ignored`, and never shown** (so junk cannot flood the Today screen). A genuine sender whose mail fails another check is recorded as `rejected` and kept, so a real setup problem is visible; a message over the daily limit is `skipped`. None of these starts a run. The exact header names SES writes are to be confirmed against a real message during the build.
 
 ### Safety of the untrusted text
 

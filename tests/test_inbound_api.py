@@ -16,5 +16,11 @@ def test_recent_emails_are_listed_newest_first_with_status_and_note(client, engi
     assert set(body["emails"][0]) == {"received_at", "status", "note", "run_id"}  # never the key or sender
 
 
+def test_ignored_mail_from_strangers_is_never_listed(client, engine):
+    stranger = store.record_received(engine, "inbound/junk", "stranger@example.net", NOW)
+    store.set_status(engine, stranger, store.IGNORED)
+    assert client.get("/api/inbound").json() == {"emails": []}
+
+
 def test_no_emails_gives_an_empty_list(client):
     assert client.get("/api/inbound").json() == {"emails": []}
