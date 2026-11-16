@@ -4,6 +4,7 @@ import {
   fmtDate,
   getJobFacets,
   getJobFields,
+  getSettings,
   listJobs,
   type JobField,
   type JobListParams,
@@ -11,8 +12,9 @@ import {
 } from '../api.ts'
 import { todayISO } from '../dates.ts'
 import ColumnsPicker from '../components/ColumnsPicker.tsx'
+import JobLink from '../components/JobLink.tsx'
+import RowStatus from '../components/RowStatus.tsx'
 import SheetImport from '../components/SheetImport.tsx'
-import StatusBadge from '../components/StatusBadge.tsx'
 import { useNav } from '../nav.tsx'
 import ContactsTab from './ContactsTab.tsx'
 import JobPage from './JobPage.tsx'
@@ -229,6 +231,7 @@ function JobsTab() {
   const [version, setVersion] = useState(0)
   const [fields, setFields] = useState<JobField[]>([])
   const [choice, setChoice] = useState<ColumnChoice>(loadColumns)
+  const [skipReasons, setSkipReasons] = useState<string[]>([])
   const latest = useRef(0)
 
   function update(patch: Partial<Filters>) {
@@ -246,6 +249,12 @@ function JobsTab() {
     getJobFields()
       .then(setFields)
       .catch(() => setFields([]))
+  }, [])
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => setSkipReasons(Array.isArray(s.skip_reasons) ? s.skip_reasons.map(String) : []))
+      .catch(() => setSkipReasons([]))
   }, [])
 
   async function afterImport() {
@@ -459,14 +468,10 @@ function JobsTab() {
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <button className="link" onClick={() => openJob(r.id)}>
-                      {r.employer}
-                    </button>
+                    <JobLink id={r.id}>{r.employer}</JobLink>
                   </td>
                   <td>
-                    <button className="link" onClick={() => openJob(r.id)}>
-                      {r.title}
-                    </button>
+                    <JobLink id={r.id}>{r.title}</JobLink>
                     {r.next_followup_due && (
                       <div className={r.next_followup_due < today ? 'followup-mark overdue' : 'followup-mark'}>
                         Follow-up due {fmtDate(r.next_followup_due)}
@@ -475,7 +480,7 @@ function JobsTab() {
                     )}
                   </td>
                   <td>
-                    <StatusBadge status={r.status} />
+                    <RowStatus job={r} skipReasons={skipReasons} onChanged={() => setVersion((v) => v + 1)} />
                   </td>
                   <td>{r.match_score == null ? '' : `${r.match_score}%`}</td>
                   <td>{fmtDate(r.applied_date)}</td>

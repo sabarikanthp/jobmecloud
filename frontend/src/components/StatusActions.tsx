@@ -3,7 +3,7 @@ import { fmtDate, listFollowUps, reopenJob, setStatus } from '../api.ts'
 import { todayISO } from '../dates.ts'
 import { errorText } from '../pages/jobFormat.ts'
 
-const LABELS: Record<string, string> = {
+export const LABELS: Record<string, string> = {
   Applied: 'Mark applied',
   Interviewing: 'Got an interview',
   Offer: 'Got an offer',
