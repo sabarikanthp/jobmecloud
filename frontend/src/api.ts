@@ -466,6 +466,7 @@ export function fmtDate(s: string | null): string {
 }
 
 export interface JobRow {
+  allowed_next: string[] // the status moves this job allows, so the list can offer them
   id: number
   employer: string
   title: string
