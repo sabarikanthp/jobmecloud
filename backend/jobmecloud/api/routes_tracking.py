@@ -11,7 +11,7 @@ from jobmecloud.config.settings import load_settings
 from jobmecloud.db.models import Job
 from jobmecloud.jobs import followups as fu_rules
 from jobmecloud.jobs import tracking
-from jobmecloud.jobs.dedup import dedup_key, fallback_key, normalize_employer, normalize_url
+from jobmecloud.jobs.duplicates import find_duplicate
 from jobmecloud.jobs.tracking import FUTURE_DATE_COPY, TrackingError, utc_date, utc_midnight
 
 router = APIRouter()
@@ -80,10 +80,6 @@ def _out(job: Job, follow_up_id: int | None = None) -> TrackingOut:
         id=job.id, status=job.status, applied_date=_iso(job.applied_at),
         first_response_date=_iso(job.first_response_at), outcome_date=_iso(job.outcome_at),
         allowed_next=tracking.allowed_next(job), follow_up_id=follow_up_id)
-
-
-def _words(text: str) -> str:
-    return " ".join(text.lower().split())
 
 
 def _job(session: Session, job_id: int) -> Job:
@@ -178,20 +174,10 @@ def add_job(body: ManualJobIn, request: Request) -> dict:
             raise HTTPException(400, LINK_COPY)
         source = parts.hostname
     location = (body.location or "").strip() or None
-    keys = {dedup_key(employer, None, title, location), fallback_key(employer, title, location)}
-    norm_url = normalize_url(url) if url else None
-    emp_norm, title_norm = normalize_employer(employer), _words(title)
     with Session(request.app.state.engine) as session:
-        for other in session.exec(select(Job)):
-            if keys & {dedup_key(other.employer, other.requisition_id, other.title, other.location),
-                       fallback_key(other.employer, other.title, other.location)}:
-                raise HTTPException(409, DUPLICATE_COPY)
-            if (normalize_employer(other.employer) == emp_norm and _words(other.title) == title_norm
-                    and (not location or not other.location
-                         or _words(other.location) == _words(location))):
-                raise HTTPException(409, DUPLICATE_COPY)
-            if norm_url and other.apply_url and normalize_url(other.apply_url) == norm_url:
-                raise HTTPException(409, DUPLICATE_COPY)
+        if find_duplicate(session, employer=employer, title=title, location=location,
+                          requisition_id=None, url=url):
+            raise HTTPException(409, DUPLICATE_COPY)
         at = _at(request)
         job = Job(employer=employer, title=title, apply_url=url, location=location,
                   notes=(body.notes or "").strip() or None, origin="manual", status="New",
