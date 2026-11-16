@@ -15,6 +15,7 @@ interface Tokens {
 const SESSION_KEY = 'jobmecloud.tokens'
 const VERIFIER_KEY = 'jobmecloud.pkce.verifier'
 const STATE_KEY = 'jobmecloud.pkce.state'
+const RETURN_KEY = 'jobmecloud.return'
 const REFRESH_MARGIN_SECONDS = 60
 
 let config: AuthConfig | null = null
@@ -71,8 +72,22 @@ function saveTokens(t: Tokens) {
 
 export const hasSession = () => readTokens() !== null
 
+// Signing in leaves the site, and Cognito sends the browser back without the part after the "#". Keep it for the
+// trip so a link to a job still lands on that job. Only the app's own addresses ("#/...") are kept.
+export function rememberWhere(): void {
+  const hash = window.location.hash
+  if (hash.startsWith('#/')) sessionStorage.setItem(RETURN_KEY, hash)
+}
+
+export function restoreWhere(): void {
+  const hash = sessionStorage.getItem(RETURN_KEY)
+  sessionStorage.removeItem(RETURN_KEY)
+  if (hash?.startsWith('#/')) window.history.replaceState({}, '', window.location.pathname + hash)
+}
+
 export async function login(): Promise<void> {
   if (!config) return
+  rememberWhere()
   const verifier = randomString()
   const state = randomString()
   sessionStorage.setItem(VERIFIER_KEY, verifier)
@@ -123,6 +138,7 @@ export async function handleCallback(): Promise<void> {
     refresh_token: typeof body.refresh_token === 'string' ? body.refresh_token : undefined,
     expires_at: Date.now() / 1000 + Number(body.expires_in ?? 3600),
   })
+  restoreWhere()
 }
 
 export async function getToken(): Promise<string | null> {

@@ -11,6 +11,7 @@ import {
 } from '../api.ts'
 import { todayISO } from '../dates.ts'
 import ColumnsPicker from '../components/ColumnsPicker.tsx'
+import JobLink from '../components/JobLink.tsx'
 import SheetImport from '../components/SheetImport.tsx'
 import StatusBadge from '../components/StatusBadge.tsx'
 import { useNav } from '../nav.tsx'
@@ -459,14 +460,10 @@ function JobsTab() {
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <button className="link" onClick={() => openJob(r.id)}>
-                      {r.employer}
-                    </button>
+                    <JobLink id={r.id}>{r.employer}</JobLink>
                   </td>
                   <td>
-                    <button className="link" onClick={() => openJob(r.id)}>
-                      {r.title}
-                    </button>
+                    <JobLink id={r.id}>{r.title}</JobLink>
                     {r.next_followup_due && (
                       <div className={r.next_followup_due < today ? 'followup-mark overdue' : 'followup-mark'}>
                         Follow-up due {fmtDate(r.next_followup_due)}

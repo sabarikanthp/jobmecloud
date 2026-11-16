@@ -112,6 +112,8 @@ button.danger { background: var(--panel); border-color: var(--danger); color: va
 button.danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
 button.link { border: 0; background: none; color: var(--accent); }
 button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
+a.link { color: var(--accent); text-decoration: none; }
+a.link:hover { text-decoration: underline; }
 .badge {
   display: inline-block;
   background: #e3f4ea;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { challengeFor, configure, getToken, nav } from './auth.ts'
+import { challengeFor, configure, getToken, handleCallback, login, nav, rememberWhere, restoreWhere } from './auth.ts'
 import { getProviders } from './api.ts'
 
 const CONFIG = { domain: 'login.example.com', clientId: 'client123' }
@@ -56,5 +56,55 @@ describe('tokens', () => {
     vi.stubGlobal('fetch', fetchMock)
     expect(await getToken()).toBe('NEW')
     expect(String(fetchMock.mock.calls[0][1].body)).toContain('grant_type=refresh_token')
+  })
+})
+
+describe('returning to the address you were on', () => {
+  beforeEach(() => {
+    window.location.hash = ''
+  })
+
+  it('remembers an app address and puts it back', () => {
+    window.location.hash = '#/jobs/12'
+    rememberWhere()
+    window.location.hash = ''
+    restoreWhere()
+    expect(window.location.hash).toBe('#/jobs/12')
+  })
+
+  it('remembers nothing for an empty or foreign fragment', () => {
+    window.location.hash = '#section'
+    rememberWhere()
+    window.location.hash = ''
+    restoreWhere()
+    expect(window.location.hash).toBe('')
+  })
+
+  it('only restores an app address, never anything else that was stored', () => {
+    sessionStorage.setItem('jobmecloud.return', 'javascript:alert(1)')
+    restoreWhere()
+    expect(window.location.hash).toBe('')
+    expect(sessionStorage.getItem('jobmecloud.return')).toBeNull()
+  })
+
+  it('starting to sign in remembers where you were', async () => {
+    vi.spyOn(nav, 'to').mockImplementation(() => {})
+    window.location.hash = '#/jobs/12'
+    await login()
+    window.location.hash = ''
+    restoreWhere()
+    expect(window.location.hash).toBe('#/jobs/12')
+  })
+
+  it('finishing sign in puts you back on that address', async () => {
+    vi.spyOn(nav, 'to').mockImplementation(() => {})
+    window.location.hash = '#/jobs/12'
+    await login()
+    const state = sessionStorage.getItem('jobmecloud.pkce.state')!
+    window.history.replaceState({}, '', `/?code=abc&state=${state}`) // Cognito sends you back without the fragment
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ access_token: 'A', expires_in: 3600 }))))
+    await handleCallback()
+    expect(window.location.hash).toBe('#/jobs/12')
+    expect(window.location.search).toBe('')
   })
 })
