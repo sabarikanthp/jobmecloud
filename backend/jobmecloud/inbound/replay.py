@@ -10,7 +10,8 @@ from jobmecloud.inbound.trust import TrustConfig
 from jobmecloud.jobs.dispatch import Dispatcher
 
 REPLAYABLE = (store.WAITING, store.FAILED)
-EVERY_STATUS = (store.RECEIVED, store.STARTED, store.REJECTED, store.SKIPPED, store.WAITING, store.DONE, store.FAILED)
+EVERY_STATUS = (store.RECEIVED, store.STARTED, store.REJECTED, store.SKIPPED, store.WAITING, store.DONE, store.FAILED,
+                store.IGNORED)
 
 
 class ReplayRefused(Exception):

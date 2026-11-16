@@ -41,6 +41,6 @@ describe('inboundNoticeText', () => {
     )
   })
   it('says nothing for emails that are fine', () => {
-    for (const status of ['received', 'processing', 'started', 'done']) expect(inboundNoticeText(status, null)).toBeNull()
+    for (const status of ['received', 'processing', 'started', 'done', 'ignored']) expect(inboundNoticeText(status, null)).toBeNull()
   })
 })

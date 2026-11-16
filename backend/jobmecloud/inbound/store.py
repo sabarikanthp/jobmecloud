@@ -10,8 +10,8 @@ from sqlmodel import Session, select
 from jobmecloud.db.models import InboundEmail
 from jobmecloud.db.retry import retry_on_conflict
 
-RECEIVED, PROCESSING, STARTED, REJECTED, SKIPPED, WAITING, DONE, FAILED = (
-    "received", "processing", "started", "rejected", "skipped", "waiting", "done", "failed")
+RECEIVED, PROCESSING, STARTED, REJECTED, SKIPPED, WAITING, DONE, FAILED, IGNORED = (
+    "received", "processing", "started", "rejected", "skipped", "waiting", "done", "failed", "ignored")
 STALE_CLAIM_SECONDS = 900  # longer than the ingest function can run, so only a crashed invocation goes stale
 
 
@@ -86,10 +86,16 @@ def _local_date(moment: datetime):
     return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone().date()
 
 
-def recent(engine: Engine, limit: int = 20) -> list[InboundEmail]:
-    """The newest emails first, so the owner can see what arrived and what became of it."""
+def recent(engine: Engine, limit: int = 20, *, include_ignored: bool = False) -> list[InboundEmail]:
+    """The newest emails first, so the owner can see what arrived and what became of it.
+
+    Mail from anyone but the allowed sender is ignored and deleted; it is left out unless asked for.
+    """
+    query = select(InboundEmail).order_by(InboundEmail.received_at.desc(), InboundEmail.id.desc()).limit(limit)
+    if not include_ignored:
+        query = query.where(InboundEmail.status != IGNORED)
     with Session(engine) as session:
-        rows = session.exec(select(InboundEmail).order_by(InboundEmail.received_at.desc(), InboundEmail.id.desc()).limit(limit)).all()
+        rows = session.exec(query).all()
         for row in rows:
             session.expunge(row)
         return list(rows)

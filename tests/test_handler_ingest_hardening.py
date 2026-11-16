@@ -31,6 +31,9 @@ class Spy:
     def head_object(self, **kwargs):
         return self.client.head_object(**kwargs)
 
+    def delete_object(self, **kwargs):
+        return self.client.delete_object(**kwargs)
+
     def get_object(self, **kwargs):
         self.gets += 1
         return self.client.get_object(**kwargs)
@@ -95,12 +98,14 @@ def test_a_claim_abandoned_by_a_crashed_invocation_is_taken_over(engine, s3):
     assert handle(engine, s3, key) == store.STARTED
 
 
-def test_a_message_over_the_size_limit_is_rejected_without_being_read(engine, s3):
+def test_a_message_over_the_size_limit_is_ignored_and_deleted_without_being_read(engine, s3):
     key = put(s3, "inbound/big", body=b"x" * (MAX_RAW_BYTES + 1))
     spy = Spy(s3)
-    assert handle(engine, spy, key) == store.REJECTED
+    assert handle(engine, spy, key) == store.IGNORED
     assert spy.gets == 0
     assert "too large" in store.get_by_key(engine, key).note
+    with pytest.raises(Exception):
+        s3.head_object(Bucket=BUCKET, Key=key)
 
 
 def test_the_lock_wait_covers_a_documents_job():

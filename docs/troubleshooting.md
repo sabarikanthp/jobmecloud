@@ -58,7 +58,7 @@ See [email-ingest.md](email-ingest.md) for how it works. Start with `uv run pyth
 
 **Nothing shows up after the report was sent.** Check the SES identity for your mail subdomain says Verified and the MX record is in place (`nslookup -type=MX mail.example.com`). The email must be sent to exactly the report address. If a different SES receiving rule set was already active, the deploy stops; read its message.
 
-**The email is `rejected`.** The note says why. The most common causes: it was sent from an address other than `inbound_sender`, the sender's mail provider did not sign it with DKIM for its own domain, or SES marked it as spam. Send from the exact allowed sender.
+**The email is `rejected`.** It came from your sender but failed a check; the note says which. The usual causes: the sender's mail provider did not sign it with DKIM for its own domain, or SES marked it as spam. A report from any other address is ignored and deleted, so it will not appear in the list at all: if your reports vanish, check that they are sent from exactly the address you gave as `inbound_sender`.
 
 **The email is `waiting`.** A run or a documents job was holding the lock. Replay it later with `scripts/reprocess_email.py --key <key>`.
 

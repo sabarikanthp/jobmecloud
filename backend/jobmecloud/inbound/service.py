@@ -5,6 +5,7 @@ claim ticket: at most one invocation processes an email at a time, so a repeated
 does nothing twice.
 """
 
+import logging
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -18,6 +19,7 @@ from jobmecloud.inbound.trust import TrustConfig, check_trust
 from jobmecloud.jobs.dispatch import Dispatcher
 from jobmecloud.jobs.runlock import RunInProgressError
 
+log = logging.getLogger(__name__)
 LOCK_POLL_SECONDS = 5
 LOCK_WAIT_SECONDS = 480  # a documents job (up to 5 minutes) or a typical email run finishes inside this
 MAX_RAW_BYTES = 2_000_000  # a report is a few thousand characters; anything this big is not one
@@ -25,9 +27,20 @@ DUPLICATE = "duplicate"
 UNREADABLE_COPY = "The email could not be read from the mail bucket."
 UNPARSEABLE_COPY = "The email could not be read: its contents were not a valid message."
 TOO_LARGE_COPY = "The message is too large."
+NOT_SENDER_COPY = "Not from the allowed sender."
 LIMIT_COPY = "The daily limit for emailed reports was reached ({n}); this one was not run."
 WAITING_COPY = "A run or documents job was in progress for too long; replay this email later with scripts/reprocess_email.py."
 HANDOFF_COPY = "The run could not be handed to the worker."
+
+
+def _ignore(engine: Engine, s3, bucket: str, key: str, email_id: int, note: str, sender: str | None = None) -> str:
+    """Mail that is not from the owner's sender: delete it now and leave no trace on the Today screen."""
+    store.set_status(engine, email_id, store.IGNORED, note=note, sender=sender)
+    try:
+        s3.delete_object(Bucket=bucket, Key=key)
+    except Exception:
+        log.warning("Could not delete ignored mail %s; the 30-day expiry will remove it", key)
+    return store.IGNORED
 
 
 def handle_email(
@@ -65,8 +78,7 @@ def handle_email(
         store.set_status(engine, email_id, store.FAILED, note=UNREADABLE_COPY)
         return store.FAILED
     if size > MAX_RAW_BYTES:  # decided before reading, so a stranger cannot make this function load a huge message
-        store.set_status(engine, email_id, store.REJECTED, note=TOO_LARGE_COPY)
-        return store.REJECTED
+        return _ignore(engine, s3, bucket, key, email_id, TOO_LARGE_COPY)
     try:
         raw = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     except Exception:
@@ -77,8 +89,9 @@ def handle_email(
     except Exception:
         store.set_status(engine, email_id, store.FAILED, note=UNPARSEABLE_COPY)
         return store.FAILED
-    if email.sender:
-        store.set_status(engine, email_id, store.PROCESSING, sender=email.sender)
+    if email.sender.lower() != config.sender.lower():  # anyone but the owner's sender: not a report at all
+        return _ignore(engine, s3, bucket, key, email_id, NOT_SENDER_COPY, sender=email.sender or None)
+    store.set_status(engine, email_id, store.PROCESSING, sender=email.sender)
 
     reason = check_trust(email, config)
     if reason:

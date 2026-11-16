@@ -93,6 +93,18 @@ def test_ingest_can_invoke_only_the_run_worker(inbound):
         assert worker_name in str(s["Resource"]) and "*" != s["Resource"]
 
 
+def test_ingest_may_delete_mail_it_ignores_but_the_run_worker_may_not(inbound):
+    bucket_name, _ = mail_bucket(inbound)
+    ingest, _ = function(inbound, "jobmecloud.handlers.ingest.handler")
+    worker, _ = function(inbound, "jobmecloud.handlers.run_worker.handler")
+
+    def deletes(name):
+        return [s for s in role_statements(inbound, name) if any(a.startswith("s3:DeleteObject") for a in actions(s))
+                and bucket_name in str(s["Resource"])]
+
+    assert deletes(ingest) and not deletes(worker)
+
+
 def test_bucket_notification_targets_the_ingest_function_for_new_mail_only(inbound):
     name, _ = function(inbound, "jobmecloud.handlers.ingest.handler")
     config = next(iter(inbound.find_resources("Custom::S3BucketNotifications").values()))["Properties"]["NotificationConfiguration"]
