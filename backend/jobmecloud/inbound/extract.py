@@ -42,10 +42,12 @@ EXTRACT_SCHEMA = {
                 "properties": {"employer": _S, "title": _S, "url": _S, "requisition_id": _S,
                               "verdict": {"type": "string", "enum": VERDICTS}, "note": _S},
                 "required": ["employer", "title", "url", "requisition_id", "verdict", "note"],
+                "additionalProperties": False,  # the provider rejects a schema without this
             },
         }
     },
     "required": ["roles"],
+    "additionalProperties": False,
 }
 
 
