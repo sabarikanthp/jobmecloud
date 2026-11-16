@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { lastRunText, staleRunText } from './runLabels.ts'
+import { inboundNoticeText, lastRunText, staleRunText } from './runLabels.ts'
 import {
+  getInbound,
   getLatestRun,
   getRunJobs,
   getSettings,
@@ -8,6 +9,7 @@ import {
   listResumes,
   startRun,
   type FollowUpRow,
+  type InboundEmailInfo,
   type ResumeList,
   type RunInfo,
   type RunJobRow,
@@ -57,6 +59,11 @@ function outcomeReason(row: RunJobRow): string {
   return ''
 }
 
+// A timestamp from the API as a Date, treating one without a zone as UTC.
+function utc(iso: string): Date {
+  return new Date(/(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`)
+}
+
 // The run's start as a local calendar date, so "Today" can say which day its results are from.
 function runDay(iso: string): { text: string; isToday: boolean } | null {
   const hasZone = /(Z|[+-]\d\d:?\d\d)$/.test(iso)
@@ -76,6 +83,7 @@ export default function Today() {
   const [skipReasons, setSkipReasons] = useState<string[]>([])
   const [due, setDue] = useState<FollowUpRow[]>([])
   const [cutoff, setCutoff] = useState<number | null>(null)
+  const [inbound, setInbound] = useState<InboundEmailInfo | null>(null)
 
   const running = run?.running ?? false
 
@@ -107,6 +115,12 @@ export default function Today() {
   useEffect(() => {
     void refreshDue()
   }, [refreshDue])
+
+  useEffect(() => {
+    getInbound()
+      .then((r) => setInbound(r.emails[0] ?? null))
+      .catch(() => setInbound(null)) // optional feature: no emails, or not set up
+  }, [])
 
   useEffect(() => {
     getSettings()
@@ -186,6 +200,12 @@ export default function Today() {
       <p className="muted">
         {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
       </p>
+      {(() => {
+        // Only an email newer than the last run can explain why that run is not today's.
+        if (!inbound || (run && utc(inbound.received_at) < utc(run.started_at))) return null
+        const notice = inboundNoticeText(inbound.status, inbound.note)
+        return notice ? <div className="result bad">{notice}</div> : null
+      })()}
       {run && !running && (() => {
         const day = runDay(run.started_at)
         if (!day) return null

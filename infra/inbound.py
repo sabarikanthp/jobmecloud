@@ -39,7 +39,7 @@ class Inbound(Construct):
         # Small and narrow: it may read the mail bucket, use the database and start the run worker. No secrets,
         # no data bucket.
         self.function = make_function(
-            "ingest", "jobmecloud.handlers.ingest.handler", timeout=180, memory=256,
+            "ingest", "jobmecloud.handlers.ingest.handler", timeout=600, memory=256,
             secrets=False, data_access=False,
             env={
                 "JOBMECLOUD_INBOUND_ADDRESS": address,

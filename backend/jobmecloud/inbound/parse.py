@@ -55,10 +55,18 @@ def _html_to_text(html: str) -> tuple[str, list[str]]:
     return re.sub(r"\n{3,}", "\n\n", text).strip(), hrefs
 
 
+def _content(part) -> str:
+    """A part's text. An unknown charset or bad bytes must never lose the email: fall back to UTF-8 with replacement."""
+    try:
+        return part.get_content()
+    except (LookupError, UnicodeError, ValueError):
+        return (part.get_payload(decode=True) or b"").decode("utf-8", errors="replace")
+
+
 def _body(msg: EmailMessage) -> tuple[str, list[str]]:
     plain, html = msg.get_body(preferencelist=("plain",)), msg.get_body(preferencelist=("html",))
-    html_text, hrefs = _html_to_text(html.get_content()) if html is not None else ("", [])
-    text = plain.get_content() if plain is not None else html_text
+    html_text, hrefs = _html_to_text(_content(html)) if html is not None else ("", [])
+    text = _content(plain) if plain is not None else html_text
     return text, hrefs
 
 

@@ -83,3 +83,10 @@ def test_extraction_tokens_are_added_to_the_cost_tracker():
 def test_empty_report_gives_no_candidates_and_no_error():
     result, _, _ = run([])
     assert result.candidates == [] and (result.dropped_no_link, result.dropped_by_verdict, result.dropped_over_cap) == (0, 0, 0)
+
+
+def test_total_roles_counts_everything_the_report_named():
+    result, _, _ = run([role("applied", url="https://jobs.example.com/a"), role("consider", url="https://jobs.example.com/b"),
+                        role("consider", url="")])
+    assert result.total_roles == 3
+    assert run([])[0].total_roles == 0

@@ -68,9 +68,9 @@ def test_mail_bucket_is_private_encrypted_https_only_and_expires_in_30_days(inbo
     assert any(s.get("Effect") == "Deny" and "aws:SecureTransport" in str(s.get("Condition")) for st in policies for s in st)
 
 
-def test_ingest_function_is_256mb_3_minutes_arm64(inbound):
+def test_ingest_function_is_256mb_10_minutes_arm64(inbound):
     _, fn = function(inbound, "jobmecloud.handlers.ingest.handler")
-    assert (fn["MemorySize"], fn["Timeout"], fn["Architectures"]) == (256, 180, ["arm64"])
+    assert (fn["MemorySize"], fn["Timeout"], fn["Architectures"]) == (256, 600, ["arm64"])
     env = fn["Environment"]["Variables"]
     assert env["JOBMECLOUD_INBOUND_ADDRESS"] == ADDRESS and env["JOBMECLOUD_INBOUND_SENDER"] == SENDER
     assert env["JOBMECLOUD_INBOUND_DAILY_LIMIT"] == "5" and "JOBMECLOUD_RUN_FUNCTION" in env
