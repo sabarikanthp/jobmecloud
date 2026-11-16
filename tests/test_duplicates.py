@@ -50,3 +50,14 @@ def test_the_finder_returns_the_existing_job(engine):
         found = find_duplicate(s, employer="Northwind Labs", title="Senior Data Engineer",
                                location=None, requisition_id=None, url=None)
         assert found is not None and found.id == job and found.title == "Senior Data Engineer"
+
+
+def test_different_requisitions_with_the_same_title_are_not_duplicates(engine):
+    add_job(engine, requisition_id="R-1", title="Senior Data Engineer", location=None)
+    assert _find(engine, requisition_id="R-2", title="Senior Data Engineer") is None
+    assert _find(engine, requisition_id="R-1", title="Senior Data Engineer") is not None
+
+
+def test_the_same_address_is_still_a_duplicate_even_with_different_requisitions(engine):
+    job = add_job(engine, requisition_id="R-1", apply_url="https://jobs.example.com/p/9")
+    assert _find(engine, requisition_id="R-2", title="Else", employer="Other", url="https://jobs.example.com/p/9") == job
