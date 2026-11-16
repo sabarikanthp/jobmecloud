@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { inboundNoticeText, lastRunText, staleRunText } from './runLabels.ts'
 import {
   getInbound,
   getLatestRun,
@@ -15,6 +14,7 @@ import {
   type RunJobRow,
 } from '../api.ts'
 import { fmtInstant, localISO, todayISO } from '../dates.ts'
+import { inboundNoticeText, lastRunText, staleRunText } from './runLabels.ts'
 import FollowUpList from '../components/FollowUpList.tsx'
 import StatusActions from '../components/StatusActions.tsx'
 import StatusBadge from '../components/StatusBadge.tsx'
@@ -191,8 +191,10 @@ export default function Today() {
   const noDocs = rows.filter((r) => !r.job.docs_folder && (r.outcome === 'matched' || r.outcome === 'prepared'))
   const matches = [...ready, ...noDocs]
   const resumeList = resumes?.resumes ?? []
-  const below = rows.filter((r) => r.outcome === 'new' && r.job.match_score != null && !r.job.docs_folder)
-  const unread = rows.filter((r) => r.outcome === 'new' && r.job.match_score == null && !r.job.docs_folder)
+  // Jobs you already decided on (skipped, rejected, applied...) stay out of the to-do sections; they remain in "Everything this run".
+  const open = (r: RunJobRow) => r.job.status === 'New' || r.job.status === 'Ready'
+  const below = rows.filter((r) => r.outcome === 'new' && r.job.match_score != null && !r.job.docs_folder && open(r))
+  const unread = rows.filter((r) => r.outcome === 'new' && r.job.match_score == null && !r.job.docs_folder && open(r))
 
   return (
     <div>
@@ -356,19 +358,43 @@ export default function Today() {
             </details>
           )}
           {unread.length > 0 && (
-            <details className="result-list">
-              <summary>Couldn't read ({unread.length})</summary>
+            <details className="result-list" open>
+              <summary>Couldn't judge the fit ({unread.length})</summary>
               <p className="help">
-                JobMe couldn't open these postings, so they weren't scored. Open them yourself to check.
+                JobMe couldn't open or read these postings, so they weren't scored. Open them yourself to check.
               </p>
-              <ul>
-                {unread.map(({ job }) => (
-                  <li key={job.id}>
-                    {job.employer} — {job.title} <ApplyLink job={job} label="Open posting" />{' '}
-                    <Chips flags={job.flags} />
-                  </li>
-                ))}
-              </ul>
+              <div className="table-wrap">
+                <table className="jobs-table below-table">
+                  <thead>
+                    <tr>
+                      <th>Job</th>
+                      <th>Pay</th>
+                      <th>Location</th>
+                      <th>Why not scored</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unread.map(({ job }) => (
+                      <tr key={job.id}>
+                        <td className="job-cell">
+                          {job.employer} — {job.title} <StatusBadge status={job.status} />{' '}
+                          <ApplyLink job={job} label="Open posting" />
+                        </td>
+                        <td className="nowrap">{formatPay(job.pay_min, job.pay_max)}</td>
+                        <td>{[job.location, job.work_mode].filter(Boolean).join(' · ') || '—'}</td>
+                        <td className="why-cell">
+                          {job.flags.length > 0 ? <Chips flags={job.flags} /> : '—'}
+                        </td>
+                        <td className="actions-cell">
+                          {canMakeDocs(job.status) && <MakeDocsButton job={job} busyId={busyId} runDocs={runDocs} />}
+                          <StatusActions job={job} skipReasons={skipReasons} onChanged={changed} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </details>
           )}
           {rows.length > 0 && (
@@ -377,7 +403,7 @@ export default function Today() {
               <ul>
                 {rows.map((row) => (
                   <li key={`${row.outcome}-${row.job.id}`}>
-                    {row.job.employer} — {row.job.title}: {outcomeLabel(row)}
+                    {row.job.employer} — {row.job.title}: {outcomeLabel(row)} <StatusBadge status={row.job.status} />
                     {matchText(row.job.match_score) && <> · {matchText(row.job.match_score)}</>}
                     {outcomeReason(row) && <div className="help">{outcomeReason(row)}</div>}
                   </li>
