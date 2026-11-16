@@ -62,7 +62,7 @@
   <text class="t" x="610" y="128">EventBridge Scheduler</text><text class="s" x="610" y="145">jobmecloud-run-HHMM</text>
 
   <rect class="fn" x="740" y="100" width="150" height="70" rx="8"/>
-  <text class="t" x="815" y="132">Run worker</text><text class="s" x="815" y="150">search, read, score, 1 GB, 15 min</text>
+  <text class="t" x="815" y="132">Run worker</text><text class="s" x="815" y="150">search + score, 15 min</text>
 
   <rect class="fn" x="740" y="200" width="150" height="70" rx="8"/>
   <text class="t" x="815" y="232">Docs worker</text><text class="s" x="815" y="250">resume + letter, 1 GB, 5 min</text>
