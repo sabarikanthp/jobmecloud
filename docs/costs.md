@@ -44,6 +44,10 @@ The stack creates a **$5 monthly budget** that emails the `owner_email` you gave
 
 A budget alerts you, it does not stop spending. If you see an alert you did not expect, open **Cost Explorer**, group by service, and look at what grew. The most likely cause is the AI provider, which is billed outside AWS.
 
+## Emailed reports (optional)
+
+If you use [email-ingest.md](email-ingest.md), SES charges a very small amount per received email, and the AI provider charges for one small call to read each report plus one per role. This usually replaces the much larger cost of a paid web search per run.
+
 ## Things that would add cost
 
 - Using a custom domain (about $0.50 a month for a Route 53 zone). The default `*.cloudfront.net` address is free.

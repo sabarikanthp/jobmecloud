@@ -62,3 +62,12 @@ def started_today(engine: Engine, now: datetime) -> int:
 def _local_date(moment: datetime):
     """The calendar date of a stored moment. The database hands back UTC, possibly without a zone attached."""
     return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone().date()
+
+
+def recent(engine: Engine, limit: int = 20) -> list[InboundEmail]:
+    """The newest emails first, so the owner can see what arrived and what became of it."""
+    with Session(engine) as session:
+        rows = session.exec(select(InboundEmail).order_by(InboundEmail.received_at.desc(), InboundEmail.id.desc()).limit(limit)).all()
+        for row in rows:
+            session.expunge(row)
+        return list(rows)

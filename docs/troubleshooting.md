@@ -52,6 +52,22 @@ Start with the symptom. If your problem is a lost password or authenticator, go 
 
 **The weekday rotation seems a day off.** Same cause: set `timezone`.
 
+## Emailed reports
+
+See [email-ingest.md](email-ingest.md) for how it works. Start with `uv run python scripts/reprocess_email.py --list`: it shows each email and its status.
+
+**Nothing shows up after the report was sent.** Check the SES identity for your mail subdomain says Verified and the MX record is in place (`nslookup -type=MX mail.example.com`). The email must be sent to exactly the report address. If a different SES receiving rule set was already active, the deploy stops; read its message.
+
+**The email is `rejected`.** The note says why. The most common causes: it was sent from an address other than `inbound_sender`, the sender's mail provider did not sign it with DKIM for its own domain, or SES marked it as spam. Send from the exact allowed sender.
+
+**The email is `waiting`.** A run or a documents job was holding the lock. Replay it later with `scripts/reprocess_email.py --key <key>`.
+
+**The email is `skipped`.** The daily limit (`inbound_daily_limit`, default 5) was reached. Raise it with a new deploy, or replay it tomorrow with `--force`.
+
+**The run finishes but found nothing.** The report named no role marked as recommended, or every role was already in your tracker, marked as applied or rejected, or had no direct link. Roles without a usable link are listed in the run's problems.
+
+**The email is `failed`.** The note says why (for example the report could not be read, or no AI connection is set up). Fix it and replay it.
+
 ## Still stuck
 
 Open an issue (without personal data or keys) with what you did, what you expected and what you saw, plus the relevant lines from the CloudWatch log group.

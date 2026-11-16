@@ -27,6 +27,7 @@ Always rebuild and redeploy after changing backend code: the old functions keep 
 | Logs | CloudWatch log groups named `<stack>-ApiLogs...`, `<stack>-RunWorkerLogs...` and `<stack>-DocsWorkerLogs...` (not `/aws/lambda/...`; list them with `aws logs describe-log-groups`). Kept 14 days |
 | A run's step-by-step record | The `logs/` folder in the data bucket (one file per run) |
 | The schedule | EventBridge, **Scheduler**, schedules named `jobmecloud-run-HHMM` (change them in Settings, not here) |
+| Emailed reports | `uv run python scripts/reprocess_email.py --list` shows each received email and its status; the ingest function's log group (`...IngestLogs...`) has the details ([email-ingest.md](email-ingest.md)) |
 | Spending | Billing and Cost Management, Budgets and Cost Explorer ([costs.md](costs.md)) |
 
 ## Limits to know about
