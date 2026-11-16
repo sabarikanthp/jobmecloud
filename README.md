@@ -38,6 +38,7 @@ uv run python scripts/publish_site.py
 | [docs/deploy.md](docs/deploy.md) | From zero to a working site: AWS account, tools, deploy, first sign-in |
 | [docs/costs.md](docs/costs.md) | What it costs, what is free, and how to set a spending alert |
 | [docs/security.md](docs/security.md) | Where your data lives, who can reach it, and what to do if a key leaks |
+| [docs/migrating-from-local.md](docs/migrating-from-local.md) | Bringing your data over from the local JobMe app |
 | [docs/operations.md](docs/operations.md) | Updating, backups and uninstalling |
 | [docs/account-recovery.md](docs/account-recovery.md) | Forgot your password or lost your authenticator? Start here |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | The problems people hit most, and the fixes |
