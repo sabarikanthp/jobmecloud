@@ -13,6 +13,7 @@ import {
 import { todayISO } from '../dates.ts'
 import ColumnsPicker from '../components/ColumnsPicker.tsx'
 import JobLink from '../components/JobLink.tsx'
+import CheckJobPanel from '../components/CheckJobPanel.tsx'
 import RowStatus from '../components/RowStatus.tsx'
 import SheetImport from '../components/SheetImport.tsx'
 import { useNav } from '../nav.tsx'
@@ -228,6 +229,7 @@ function JobsTab() {
   const [sources, setSources] = useState<string[]>([])
   const [adding, setAdding] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [version, setVersion] = useState(0)
   const [fields, setFields] = useState<JobField[]>([])
   const [choice, setChoice] = useState<ColumnChoice>(loadColumns)
@@ -340,8 +342,16 @@ function JobsTab() {
         <button className="add" onClick={() => setAdding((a) => !a)}>
           Add a job
         </button>
+        <button onClick={() => setChecking((c) => !c)}>Check a job</button>
         <button onClick={() => setImporting((i) => !i)}>Import</button>
       </div>
+      {checking && (
+        <CheckJobPanel
+          skipReasons={skipReasons}
+          onChanged={() => setVersion((v) => v + 1)}
+          onClose={() => setChecking(false)}
+        />
+      )}
       {adding && <AddJobForm onCancel={() => setAdding(false)} onAdded={openJob} />}
       {importing && (
         <SheetImport fields={fields} onClose={() => setImporting(false)} onImported={afterImport} />

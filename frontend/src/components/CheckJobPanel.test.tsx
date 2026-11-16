@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
-import { checkJob, fitJob, getFitChoices, type CheckResult, type FitResult } from '../api.ts'
+import { checkJob, fitJob, getFitChoices, getJob, listFollowUps, listResumes, makeDocs, setStatus, type CheckResult, type FitResult } from '../api.ts'
 import CheckJobPanel from './CheckJobPanel.tsx'
 
 vi.mock('../api.ts', async (importOriginal) => ({
@@ -9,6 +9,11 @@ vi.mock('../api.ts', async (importOriginal) => ({
   checkJob: vi.fn(),
   fitJob: vi.fn(),
   getFitChoices: vi.fn(),
+  getJob: vi.fn(),
+  listResumes: vi.fn(),
+  listFollowUps: vi.fn(),
+  setStatus: vi.fn(),
+  makeDocs: vi.fn(),
 }))
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -26,16 +31,21 @@ const FIT: FitResult = {
 const created = (): CheckResult => ({ status: 'created', truncated: false, job: JOB })
 const fitReply = (fit: FitResult = FIT) => ({ fit, job: { id: 12, status: 'New', allowed_next: ['Applied', 'Skipped'], match_score: fit.score } })
 
+const detail = (status: string, allowed: string[] = ['Applied', 'Skipped']) =>
+  ({ ...JOB, status, allowed_next: allowed, docs_note: null, docs_error: null, docs_folder: null }) as never
+
 let container: HTMLDivElement
 let root: Root
 let changed: Mock<() => void>
+let closed: Mock<() => void>
 
 async function mount() {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   changed = vi.fn<() => void>()
-  await act(async () => root.render(<CheckJobPanel skipReasons={['Pay too low']} onChanged={changed} onClose={() => {}} />))
+  closed = vi.fn<() => void>()
+  await act(async () => root.render(<CheckJobPanel skipReasons={['Pay too low']} onChanged={changed} onClose={closed} />))
 }
 
 const box = () => container.querySelector('textarea') as HTMLTextAreaElement
@@ -64,6 +74,11 @@ beforeEach(() => {
   vi.mocked(getFitChoices).mockReset().mockResolvedValue(CHOICES)
   vi.mocked(checkJob).mockReset().mockResolvedValue(created())
   vi.mocked(fitJob).mockReset().mockResolvedValue(fitReply())
+  vi.mocked(getJob).mockReset().mockResolvedValue(detail('New'))
+  vi.mocked(listResumes).mockReset().mockResolvedValue({ resumes: [{ id: 'r1', name: 'Main resume', is_default: true }], default_id: 'r1' } as never)
+  vi.mocked(listFollowUps).mockReset().mockResolvedValue([])
+  vi.mocked(setStatus).mockReset().mockResolvedValue({ follow_up_id: null } as never)
+  vi.mocked(makeDocs).mockReset().mockResolvedValue({} as never)
 })
 afterEach(async () => {
   await act(async () => root.unmount())
@@ -178,5 +193,84 @@ describe('CheckJobPanel', () => {
     await type(box(), 'some job text')
     await click(button('Check fit'))
     expect(changed.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+async function checked() {
+  await mount()
+  await type(box(), 'some job text')
+  await click(button('Check fit'))
+}
+const form = () => container.querySelector('form.inline-form') as HTMLFormElement | null
+const submit = async () => act(async () => void (form()!.querySelector('button[type="submit"]') as HTMLButtonElement).click())
+
+describe('CheckJobPanel decision and documents', () => {
+  it('shows the decision controls after a fit and not before', async () => {
+    await mount()
+    expect(button('Mark applied')).toBeUndefined()
+    expect(button('Leave it for now')).toBeUndefined()
+    await type(box(), 'some job text')
+    await click(button('Check fit'))
+    expect(button('Mark applied')).toBeTruthy()
+    expect(button('Skip')).toBeTruthy()
+    expect(button('Leave it for now')).toBeTruthy()
+  })
+
+  it('marks the job applied through the status call and refreshes', async () => {
+    await checked()
+    const before = changed.mock.calls.length
+    await click(button('Mark applied'))
+    await submit()
+    expect(setStatus).toHaveBeenCalledWith(12, expect.objectContaining({ status: 'Applied' }))
+    expect(changed.mock.calls.length).toBeGreaterThan(before)
+  })
+
+  it('asks for a reason before skipping', async () => {
+    await checked()
+    await click(button('Skip'))
+    expect(form()!.textContent).toContain('Why are you skipping this job?')
+    expect((form()!.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(true)
+    expect(setStatus).not.toHaveBeenCalled()
+  })
+
+  it('closes the panel on Leave it for now and keeps the job', async () => {
+    await checked()
+    await click(button('Leave it for now'))
+    expect(closed).toHaveBeenCalledTimes(1)
+    expect(setStatus).not.toHaveBeenCalled()
+  })
+
+  it('shows the documents controls only once the job is applied', async () => {
+    await checked()
+    expect(button('Make docs')).toBeUndefined()
+    vi.mocked(getJob).mockResolvedValue(detail('Applied', ['Interviewing', 'Rejected']))
+    await click(button('Mark applied'))
+    await submit()
+    expect(button('Make docs')).toBeTruthy()
+  })
+
+  it('never starts documents without the button being pressed', async () => {
+    vi.mocked(getJob).mockResolvedValue(detail('Applied', ['Interviewing']))
+    await checked()
+    await click(button('Leave it for now')) // the job is already applied: documents are offered, not started
+    expect(button('Make docs')).toBeTruthy()
+    expect(makeDocs).not.toHaveBeenCalled()
+  })
+
+  it('points to Settings when there is no resume', async () => {
+    vi.mocked(listResumes).mockResolvedValue({ resumes: [], default_id: null } as never)
+    vi.mocked(getJob).mockResolvedValue(detail('Applied', ['Interviewing']))
+    await checked()
+    expect(container.textContent).toContain('Settings')
+    expect(button('Make docs')).toBeUndefined()
+  })
+
+  it('shows the follow-up date after applying', async () => {
+    vi.mocked(setStatus).mockResolvedValue({ follow_up_id: 5 } as never)
+    vi.mocked(listFollowUps).mockResolvedValue([{ id: 5, due_date: '2026-11-23' }] as never)
+    await checked()
+    await click(button('Mark applied'))
+    await submit()
+    expect(container.textContent).toContain('A check-in is set for')
   })
 })

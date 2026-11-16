@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
-import { checkJob, fitJob, getFitChoices, type CheckedJob, type FitChoice, type FitResult } from '../api.ts'
+import { checkJob, fitJob, getFitChoices, getJob, listResumes, type CheckedJob, type FitChoice, type FitResult, type JobDetail, type ResumeList } from '../api.ts'
+import DocsActions from '../pages/DocsActions.tsx'
 import { errorText } from '../pages/jobFormat.ts'
+import { useDocsRunner } from '../pages/useDocsRunner.ts'
 import FitCard from './FitCard.tsx'
 import JobLink from './JobLink.tsx'
+import StatusActions from './StatusActions.tsx'
 
 type Phase = 'idle' | 'reading' | 'judging'
 
 // Paste a job's text or link, have an AI read it and say how well it fits, and keep it in the tracker.
 // The job is saved as soon as it is read, so a failure while judging never loses it.
 export default function CheckJobPanel({
+  skipReasons,
   onChanged,
   onClose,
 }: {
@@ -25,6 +29,11 @@ export default function CheckJobPanel({
   const [duplicate, setDuplicate] = useState(false)
   const [truncated, setTruncated] = useState(false)
   const [fit, setFit] = useState<FitResult | null>(null)
+  const [current, setCurrent] = useState<JobDetail | null>(null) // the saved job as it is now, after any decision
+  const [resumes, setResumes] = useState<ResumeList | null>(null)
+  const { busyId, runDocs } = useDocsRunner(async () => {
+    if (saved) setCurrent(await getJob(saved.id))
+  })
 
   useEffect(() => {
     getFitChoices()
@@ -35,12 +44,32 @@ export default function CheckJobPanel({
       .catch((e) => setError(errorText(e)))
   }, [])
 
+  async function refresh(id: number) {
+    try {
+      setCurrent(await getJob(id))
+    } catch {
+      setCurrent(null) // the decision controls simply do not appear; the fit above is still shown
+    }
+  }
+
+  // Decisions change the job, so show what it is now. Documents are offered once it is applied, never made for you.
+  async function decided() {
+    if (saved) await refresh(saved.id)
+    await onChanged()
+  }
+
+  const applied = current?.status === 'Applied'
+  useEffect(() => {
+    if (applied && !resumes) listResumes().then(setResumes).catch(() => setResumes({ resumes: [], default_id: null } as ResumeList))
+  }, [applied, resumes])
+
   async function judge(id: number) {
     setPhase('judging')
     setError('')
     try {
       const res = await fitJob(id, step)
       setFit(res.fit)
+      await refresh(id)
       await onChanged()
     } catch (e) {
       setError(errorText(e))
@@ -52,6 +81,7 @@ export default function CheckJobPanel({
   async function run() {
     setError('')
     setFit(null)
+    setCurrent(null)
     setSaved(null)
     setDuplicate(false)
     setTruncated(false)
@@ -128,6 +158,37 @@ export default function CheckJobPanel({
         </div>
       )}
       {fit && <FitCard fit={fit} />}
+      {fit && current && (
+        <div className="check-decision">
+          <h4>What do you want to do with it?</h4>
+          <StatusActions job={current} skipReasons={skipReasons} onChanged={decided} />
+          <p>
+            <button type="button" onClick={onClose}>
+              Leave it for now
+            </button>
+          </p>
+        </div>
+      )}
+      {fit && current && applied && (
+        <div className="check-docs">
+          <h4>Documents (optional)</h4>
+          {resumes && resumes.resumes.length === 0 ? (
+            <p className="help">To make a resume and cover letter, add a resume in Settings first.</p>
+          ) : (
+            resumes && (
+              <DocsActions
+                job={current}
+                resumes={resumes.resumes}
+                defaultId={resumes.default_id}
+                busyId={busyId}
+                runDocs={runDocs}
+                makeable
+                hasDocs={current.docs_folder !== null}
+              />
+            )
+          )}
+        </div>
+      )}
     </div>
   )
 }
