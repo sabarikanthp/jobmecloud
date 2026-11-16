@@ -52,6 +52,7 @@ def test_without_inbound_settings_nothing_is_added(template):
     assert "jobmecloud.handlers.ingest.handler" not in handlers
     assert len(template.find_resources("AWS::S3::Bucket")) == 2
     assert "MailBucketName" not in template.to_json()["Outputs"]
+    assert not template.find_resources("AWS::SES::ReceiptRuleSet")
 
 
 def test_mail_bucket_is_private_encrypted_https_only_and_expires_in_30_days(inbound):
@@ -117,3 +118,42 @@ def test_address_and_sender_must_be_given_together(lambda_dist):
         build(lambda_dist, inbound_address=ADDRESS)
     with pytest.raises(ValueError, match="both"):
         build(lambda_dist, inbound_sender=SENDER)
+
+
+def rule(template):
+    found = template.find_resources("AWS::SES::ReceiptRule")
+    assert len(found) == 1
+    return next(iter(found.values()))["Properties"]["Rule"]
+
+
+def test_receipt_rule_matches_only_the_configured_address(inbound):
+    assert rule(inbound)["Recipients"] == [ADDRESS]
+
+
+def test_rule_scans_for_spam_and_virus_and_requires_tls(inbound):
+    r = rule(inbound)
+    assert r["ScanEnabled"] is True and r["TlsPolicy"] == "Require" and r["Enabled"] is True
+
+
+def test_rule_writes_to_the_mail_bucket_under_the_inbound_prefix(inbound):
+    bucket_name, _ = mail_bucket(inbound)
+    action = rule(inbound)["Actions"][0]["S3Action"]
+    assert action["BucketName"] == {"Ref": bucket_name} and action["ObjectKeyPrefix"] == "inbound/"
+
+
+def test_bucket_policy_lets_ses_write_only_from_this_account(inbound):
+    bucket_name, _ = mail_bucket(inbound)
+    statements = [s for p in inbound.find_resources("AWS::S3::BucketPolicy").values()
+                  if p["Properties"]["Bucket"] == {"Ref": bucket_name}
+                  for s in p["Properties"]["PolicyDocument"]["Statement"]]
+    ses = [s for s in statements if s.get("Principal") == {"Service": "ses.amazonaws.com"}]
+    assert ses and all(s["Action"] == "s3:PutObject" for s in ses)
+    assert all(s["Condition"]["StringEquals"]["aws:SourceAccount"] == {"Ref": "AWS::AccountId"} for s in ses)
+    assert all(s["Resource"]["Fn::Join"][1][-1] == "/inbound/*" for s in ses)  # only under the inbound prefix
+
+
+def test_a_custom_resource_activates_the_rule_set(inbound):
+    rule_set = next(iter(inbound.find_resources("AWS::SES::ReceiptRuleSet")))
+    resources = [r for r in inbound.to_json()["Resources"].values()
+                 if r["Type"] == "AWS::CloudFormation::CustomResource" and r["Properties"].get("RuleSetName") == {"Ref": rule_set}]
+    assert len(resources) == 1
