@@ -12,6 +12,7 @@ from jobmecloud.db.retry import retry_on_conflict
 
 RECEIVED, PROCESSING, STARTED, REJECTED, SKIPPED, WAITING, DONE, FAILED, IGNORED = (
     "received", "processing", "started", "rejected", "skipped", "waiting", "done", "failed", "ignored")
+HEALTHY = (PROCESSING, STARTED, DONE)
 STALE_CLAIM_SECONDS = 900  # longer than the ingest function can run, so only a crashed invocation goes stale
 
 
@@ -51,6 +52,8 @@ def set_status(engine: Engine, email_id: int, status: str, *, run_id: int | None
             row.run_id = run_id
         if note is not None:
             row.note = note
+        elif status in HEALTHY:  # a good status must not carry an old failure's explanation
+            row.note = None
         session.add(row)
         session.commit()
 

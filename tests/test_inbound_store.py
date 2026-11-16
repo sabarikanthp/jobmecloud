@@ -88,6 +88,18 @@ def test_recent_hides_ignored_mail_unless_asked(engine):
     assert [r.s3_key for r in store.recent(engine, include_ignored=True)] == ["inbound/b", "inbound/a"]
 
 
+def test_a_later_good_status_clears_an_old_failure_note(engine):
+    email_id = store.record_received(engine, "inbox/abc", None, NOW)
+    store.set_status(engine, email_id, store.FAILED, note="The provider returned an error.")
+    for good in (store.PROCESSING, store.STARTED, store.DONE):
+        store.set_status(engine, email_id, store.FAILED, note="old")
+        store.set_status(engine, email_id, good)
+        assert store.get_by_key(engine, "inbox/abc").note is None
+    store.set_status(engine, email_id, store.WAITING, note="kept")
+    store.set_status(engine, email_id, store.WAITING)  # a status that explains itself keeps its note
+    assert store.get_by_key(engine, "inbox/abc").note == "kept"
+
+
 def test_set_status_can_fill_in_the_sender(engine):
     email_id = store.record_received(engine, "inbox/abc", None, NOW)
     store.set_status(engine, email_id, store.REJECTED, sender="sender@example.com")
