@@ -139,6 +139,18 @@ Searches need a web-search source. With Anthropic the built-in web search is use
 
 Set the **spending limit per run** in Settings (the default is $2) so one run can never cost more than you expect.
 
+## Optional: use your own address
+
+By default the site lives at a `*.cloudfront.net` address. To use your own hostname (for example `jobs.example.com`) you need a domain whose DNS you can edit (Cloudflare, Route 53, or any other provider). It costs nothing extra: AWS certificates and CloudFront hostnames are free.
+
+1. **Request a certificate in `us-east-1`** (CloudFront only accepts certificates from there, whatever region you deployed to): in the console open **Certificate Manager**, switch to **N. Virginia**, choose **Request**, enter your hostname and pick **DNS validation**. Or run `aws acm request-certificate --domain-name jobs.example.com --validation-method DNS --region us-east-1`.
+2. **Add the validation record** it shows (one CNAME) at your DNS provider. If you use Cloudflare, set it to **DNS only** (grey cloud). Wait until the certificate says **Issued**.
+3. **Deploy with two extra settings:** `cdk deploy ... -c site_domain=jobs.example.com -c certificate_arn=<the certificate's ARN>`. Both are required together. Use the same two settings on every later deploy.
+4. **Point the hostname at CloudFront:** add a CNAME for your hostname with the `DistributionDomain` value from the deploy output as its target (DNS only on Cloudflare).
+5. Open `https://jobs.example.com/` and sign in. The `*.cloudfront.net` address keeps working too.
+
+The sign-in page itself stays on its `amazoncognito.com` address; giving it your own hostname needs a second certificate and is not covered here.
+
 ## Prefer plain CloudFormation?
 
 The infrastructure is written with the AWS CDK in [`infra/`](../infra). CDK turns it into a CloudFormation template for you: `cdk synth` writes it to `cdk.out/` (ignored by git, because it contains your account number). That template refers to the Lambda code CDK uploads to the bootstrap bucket, so it cannot be deployed on its own with the CloudFormation console. Use `cdk deploy`, or run `cdk synth` and read the template if you want to review what will be created.

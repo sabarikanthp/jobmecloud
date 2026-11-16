@@ -17,6 +17,8 @@ JobMeCloudStack(
     sender_email=app.node.try_get_context("sender_email") or owner_email,
     lambda_dist=app.node.try_get_context("lambda_dist") or "dist/lambda",
     timezone=app.node.try_get_context("timezone") or "UTC",
+    site_domain=app.node.try_get_context("site_domain"),
+    certificate_arn=app.node.try_get_context("certificate_arn"),
     env=cdk.Environment(account=os.environ.get("CDK_DEFAULT_ACCOUNT"), region=os.environ.get("CDK_DEFAULT_REGION")),
 )
 app.synth()

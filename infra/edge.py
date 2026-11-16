@@ -4,6 +4,7 @@ from aws_cdk import Fn
 from aws_cdk import aws_apigatewayv2 as apigw
 from aws_cdk import aws_apigatewayv2_authorizers as authorizers
 from aws_cdk import aws_apigatewayv2_integrations as integrations
+from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_cloudfront as cloudfront
 from aws_cdk import aws_cloudfront_origins as origins
 from aws_cdk import aws_cognito as cognito
@@ -16,7 +17,8 @@ LOCAL_DEV_URL = "http://localhost:5173/"
 
 class Edge(Construct):
     def __init__(self, scope: Construct, id: str, *, api_function: lambda_.IFunction, site_bucket: s3.IBucket,
-                 user_pool: cognito.IUserPool, client: cognito.UserPoolClient, region: str) -> None:
+                 user_pool: cognito.IUserPool, client: cognito.UserPoolClient, region: str,
+                 site_domain: str | None = None, certificate_arn: str | None = None) -> None:
         super().__init__(scope, id)
 
         # Every route needs a valid access token from our user pool.
@@ -38,6 +40,8 @@ class Edge(Construct):
         self.distribution = cloudfront.Distribution(
             self, "Distribution",
             default_root_object="index.html",
+            domain_names=[site_domain] if site_domain else None,
+            certificate=acm.Certificate.from_certificate_arn(self, "SiteCertificate", certificate_arn) if certificate_arn else None,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=origins.S3BucketOrigin.with_origin_access_control(site_bucket),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -54,8 +58,11 @@ class Edge(Construct):
         )
 
         # Now the site address is known, let the browser app sign users back in to it.
-        site_url = f"https://{self.distribution.distribution_domain_name}/"
+        cloudfront_url = f"https://{self.distribution.distribution_domain_name}/"
+        site_url = f"https://{site_domain}/" if site_domain else cloudfront_url
+        # With your own hostname the CloudFront address keeps working too, so a sign-in there is never refused.
+        allowed = [site_url, *([cloudfront_url] if site_domain else []), LOCAL_DEV_URL]
         cfn_client = client.node.default_child
-        cfn_client.callback_ur_ls = [site_url, LOCAL_DEV_URL]
-        cfn_client.logout_ur_ls = [site_url, LOCAL_DEV_URL]
+        cfn_client.callback_ur_ls = allowed
+        cfn_client.logout_ur_ls = allowed
         self.site_url = site_url

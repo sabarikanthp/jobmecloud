@@ -12,7 +12,7 @@ uv run python scripts/migrate_db.py
 uv run python scripts/publish_site.py
 ```
 
-Always rebuild and redeploy after changing backend code: the old functions keep running until you do. Use the same `-c` values you deployed with. `cdk deploy` shows a summary of what will change and asks before applying it; read it. `migrate_db.py` is safe to repeat: it only adds what is missing. The release notes say if anything needs more than this.
+Always rebuild and redeploy after changing backend code: the old functions keep running until you do. Use the same `-c` values you deployed with (including `site_domain` and `certificate_arn` if you set them). `cdk deploy` shows a summary of what will change and asks before applying it; read it. `migrate_db.py` is safe to repeat: it only adds what is missing. The release notes say if anything needs more than this.
 
 ## Backups
 

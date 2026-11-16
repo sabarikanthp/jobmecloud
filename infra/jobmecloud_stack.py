@@ -35,8 +35,13 @@ def _private_bucket(scope: Construct, id: str, *, versioned: bool) -> s3.Bucket:
 
 class JobMeCloudStack(Stack):
     def __init__(self, scope: Construct, id: str, *, owner_email: str, sender_email: str,
-                 lambda_dist: str, timezone: str = "UTC", **kwargs) -> None:
+                 lambda_dist: str, timezone: str = "UTC", site_domain: str | None = None,
+                 certificate_arn: str | None = None, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
+        if bool(site_domain) != bool(certificate_arn):
+            raise ValueError("Give both site_domain and certificate_arn, or neither.")
+        if certificate_arn and ":acm:us-east-1:" not in certificate_arn:
+            raise ValueError("CloudFront only accepts certificates from us-east-1; request the certificate there.")
         self.owner_email = owner_email
         self.sender_email = sender_email
         self.lambda_dist = Path(lambda_dist)
@@ -87,6 +92,7 @@ class JobMeCloudStack(Stack):
         self.edge = Edge(
             self, "Edge", api_function=self.api_function, site_bucket=self.site_bucket,
             user_pool=self.auth.user_pool, client=self.auth.spa_client, region=self.region,
+            site_domain=site_domain, certificate_arn=certificate_arn,
         )
         for name, value in {
             "SiteUrl": self.edge.site_url,
@@ -94,6 +100,7 @@ class JobMeCloudStack(Stack):
             "ClientId": self.auth.spa_client.user_pool_client_id,
             "SiteBucketName": self.site_bucket.bucket_name,
             "DistributionId": self.edge.distribution.distribution_id,
+            "DistributionDomain": self.edge.distribution.distribution_domain_name,
             "LoginDomain": f"{self.auth.domain.domain_name}.auth.{self.region}.amazoncognito.com",
             "Region": self.region,
             "DatabaseEndpoint": self.dsql_cluster.attr_endpoint,
