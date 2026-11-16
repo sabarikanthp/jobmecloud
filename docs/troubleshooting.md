@@ -64,6 +64,16 @@ See [deploy.md](deploy.md), "Optional: use your own address".
 
 **The weekday rotation seems a day off.** Same cause: set `timezone`.
 
+## Checking a job
+
+**"JobMeCloud couldn't read that page."** The site needs a browser to show the job, or blocked the request. Copy the posting's text and paste that instead. LinkedIn links are never opened, for the same reason.
+
+**"Couldn't tell the employer and job title."** The pasted text did not say who is hiring or what the role is. Include the heading with the company and title, or add the job by hand.
+
+**"The fit failed" with a Retry fit button.** The job was already saved; only the judging step failed (often the AI key, a rate limit, or a slow answer). Press **Retry fit**, or pick another AI from the list.
+
+**It says the job is already in your tracker.** It matched an existing job by requisition, employer and title, or link. Open that job, or press **Re-check fit** to refresh its score.
+
 ## Emailed reports
 
 See [email-ingest.md](email-ingest.md) for how it works. Start with `uv run python scripts/reprocess_email.py --list`: it shows each email and its status.
