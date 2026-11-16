@@ -5,7 +5,8 @@ Thanks for helping. Bug reports, fixes, docs improvements and ideas are all welc
 ## Before you open an issue or pull request
 
 - **Never include personal data**: no resumes, real names or emails, AWS account numbers, access keys, API keys or run logs. Use made-up examples (`jordan@example.com`, account `123456789012`).
-- Report security problems privately, as described in [docs/security.md](docs/security.md).
+- Report security problems privately, as described in [SECURITY.md](SECURITY.md).
+- Every pull request runs the same tests on GitHub (the backend and infrastructure tests, and the frontend tests and build), and needs the maintainer's review before it can be merged (see `.github/CODEOWNERS`).
 
 ## Set up for development
 
