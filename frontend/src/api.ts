@@ -49,6 +49,14 @@ export interface UserProfile {
   links: string[]
 }
 
+/** Fired after any successful write, so parts of the page (like the menu count) can refresh. */
+export const CHANGED_EVENT = 'jobmecloud:changed'
+
+export interface FollowUpCounts {
+  overdue: number
+  due_today: number
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }
   const token = await getToken()
@@ -78,9 +86,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(detail || `Something went wrong (error ${res.status}).`)
   }
+  const method = (init?.method ?? 'GET').toUpperCase()
+  if (method !== 'GET') window.dispatchEvent(new Event(CHANGED_EVENT))
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
+
+export const getFollowUpCounts = () => request<FollowUpCounts>('/followups/counts')
 
 export const getProviders = () => request<ProviderOut[]>('/providers')
 
