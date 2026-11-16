@@ -47,4 +47,4 @@ Run the reset in [account-recovery.md](account-recovery.md); it deletes and recr
 
 ## Reporting a vulnerability
 
-Please use the repository's private **Security advisories** feature (the Security tab on GitHub) rather than a public issue.
+Please use the repository's private **Security advisories** feature (the Security tab on GitHub) rather than a public issue. The full policy is in [SECURITY.md](../SECURITY.md).
