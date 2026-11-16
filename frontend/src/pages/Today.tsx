@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { lastRunText, staleRunText } from './runLabels.ts'
 import {
   getLatestRun,
   getRunJobs,
@@ -189,11 +190,9 @@ export default function Today() {
         const day = runDay(run.started_at)
         if (!day) return null
         return day.isToday ? (
-          <p className="muted">Last search: {day.text}</p>
+          <p className="muted">{lastRunText(run.trigger, day.text)}</p>
         ) : (
-          <div className="result bad">
-            No search has run today. The results below are from your last search on {day.text}.
-          </div>
+          <div className="result bad">{staleRunText(run.trigger, day.text)}</div>
         )
       })()}
       <div className="row">
