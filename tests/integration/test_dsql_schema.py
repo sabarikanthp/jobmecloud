@@ -40,3 +40,26 @@ def test_schema_roundtrip_with_json_and_foreign_key():
             s.delete(s.get(Job, job.id))
             s.delete(s.get(Run, run.id))
             s.commit()
+
+
+def test_inbound_email_table_works_on_a_real_cluster():
+    import uuid
+
+    from jobmecloud.db.models import InboundEmail
+    from jobmecloud.inbound import store
+
+    engine = make_engine()
+    migrate(engine)
+    key = f"inbox/test-{uuid.uuid4().hex}"
+    now = datetime.now(UTC)
+    try:
+        email_id = store.record_received(engine, key, "sender@example.com", now)
+        assert isinstance(email_id, int)
+        assert store.record_received(engine, key, "sender@example.com", now) is None  # the unique key holds
+        store.set_status(engine, email_id, store.WAITING, note="test")
+        assert store.get_by_key(engine, key).status == store.WAITING
+    finally:  # leave the real database as we found it
+        with Session(engine) as s:
+            for row in s.exec(select(InboundEmail).where(InboundEmail.s3_key == key)):
+                s.delete(row)
+            s.commit()

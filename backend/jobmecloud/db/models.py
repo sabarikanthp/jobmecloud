@@ -147,3 +147,17 @@ class CustomValue(SQLModel, table=True):
     job_id: int = fk("job.id")
     field_id: int = fk("customfield.id")
     value: str
+
+
+class InboundEmail(SQLModel, table=True):
+    """One emailed report that reached the mail bucket, and what became of it. The key makes ingestion idempotent."""
+
+    __table_args__ = (UniqueConstraint("s3_key"),)
+
+    id: int | None = pk_column()
+    s3_key: str
+    received_at: datetime
+    sender: str | None = None
+    status: str  # received / started / rejected / skipped / waiting / done / failed
+    run_id: int | None = fk("run.id", optional=True)
+    note: str | None = None
