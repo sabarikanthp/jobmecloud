@@ -29,6 +29,8 @@ class Candidate:
     url: str
     employer: str
     title: str
+    verdict: str | None = None  # what an emailed report said about it (email runs only)
+    note: str | None = None
 
 
 def todays_watchlist(employers: list[WatchlistEmployer], day: Day) -> list[WatchlistEmployer]:
