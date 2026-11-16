@@ -172,3 +172,16 @@ def test_provider_not_configured_gives_the_plain_message(data_dir):
     job = add_job(app.state.engine)
     r = fit(app, job)
     assert r.status_code == 400 and r.json()["detail"] == "Connect an AI first."
+
+
+def test_a_slow_ai_answer_is_reported_in_plain_words_and_changes_nothing(data_dir, monkeypatch):
+    import time
+
+    from jobmecloud.jobs import check
+    monkeypatch.setattr(check, "CHECK_BUDGET_SECONDS", 0.3)
+    app = make(data_dir, {"fake": FakeProvider(replies=[lambda kw: (time.sleep(1.5), score_json(80))[1]])})
+    job = add_job(app.state.engine)
+    before = stored(app, job).model_dump()
+    r = fit(app, job)
+    assert r.status_code == 504 and "took too long" in r.json()["detail"].lower()
+    assert stored(app, job).model_dump() == before

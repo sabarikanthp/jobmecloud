@@ -1,7 +1,10 @@
 """Check a job: read pasted text or a link, and save it as a new job in the tracker."""
 
 import ipaddress
+import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal, TypedDict
@@ -28,6 +31,8 @@ from jobmecloud.llm.steps import StepNotConfiguredError, provider_for_step
 from jobmecloud.llm.types import Provider
 
 MIN_PAGE_CHARS = 300
+MIN_TEXT_CHARS = 200
+CHECK_BUDGET_SECONDS = 24  # the API function stops at 30 seconds; answer plainly before it does
 MAX_TEXT_CHARS = 30_000
 
 EMPTY_COPY = "Paste the job's text or its link first."
@@ -37,6 +42,8 @@ UNREADABLE_COPY = (
     "JobMeCloud couldn't read that page. Open the job, copy its text, and paste the text here instead."
 )
 CLOSED_COPY = "That posting looks closed, so it was not saved. If you still want it, paste the job's text instead."
+TOO_SHORT_COPY = "That is too short to be a job posting. Paste the whole posting, including what the role involves."
+TOO_SLOW_COPY = "That took too long. Try again, or pick a faster AI."
 MISSING_COPY = (
     "Couldn't tell the employer and job title from that. Include them in the text and try again, "
     "or add the job by hand."
@@ -64,6 +71,20 @@ def classify_input(raw: str) -> tuple[Literal["link", "text"], str]:
     if "://" in text and not any(c.isspace() for c in text):
         return "link", text
     return "text", text
+
+
+def _within(deadline: float, fn: Callable, *args):
+    """Run `fn`, giving up with a plain message once the deadline passes (the work may finish unseen)."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise CheckError(TOO_SLOW_COPY, 504)
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        return pool.submit(fn, *args).result(timeout=remaining)
+    except FutureTimeout:
+        raise CheckError(TOO_SLOW_COPY, 504)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def _check_link(url: str) -> str:
@@ -94,6 +115,21 @@ def _known_by_address(session: Session, url: str) -> Job | None:
     return None
 
 
+def _fill_blanks(session: Session, job: Job, posting: Posting, now: datetime) -> None:
+    """A job that was added without its details (an import, or by hand) learns them from the posting just read."""
+    changed = False
+    for field in ("description", "requisition_id", "location", "work_mode", "pay_min", "pay_max", "posted_date"):
+        if not getattr(job, field) and getattr(posting, field):
+            setattr(job, field, getattr(posting, field))
+            changed = True
+    if changed:
+        session.add(job)
+        tracking.log(session, entity_type="job", entity_id=job.id, job_id=job.id, action="details_added", at=now,
+                     note="Filled in missing details from a pasted posting")
+        session.commit()
+        session.refresh(job)
+
+
 def read_job(
     session: Session,
     *,
@@ -107,18 +143,21 @@ def read_job(
     prices: dict[str, Price],
     cap: float,
 ) -> ReadResult:
+    deadline = time.monotonic() + CHECK_BUDGET_SECONDS
     kind, text = classify_input(raw)
     if not text:
         raise CheckError(EMPTY_COPY)
+    if kind == "text" and len(text) < MIN_TEXT_CHARS:
+        raise CheckError(TOO_SHORT_COPY, 422)
 
     host: str | None = None
     state = "unknown"
     if kind == "link":
         host = _check_link(text)
         known = _known_by_address(session, text)
-        if known is not None:
+        if known is not None and (known.description or "").strip():
             return {"status": "duplicate", "job": known, "truncated": False}
-        page = fetch(text)
+        page = _within(deadline, fetch, text)
         state = check_page(page, "")
         if state == "closed":
             raise CheckError(CLOSED_COPY, 422)
@@ -132,7 +171,7 @@ def read_job(
     body = body[:MAX_TEXT_CHARS]
     costs = CostTracker(prices, cap)
     candidate = Candidate(url=link, employer="", title="")
-    posting = extract_posting(provider, model, candidate, FetchResult(link, 200, body), costs)
+    posting = _within(deadline, extract_posting, provider, model, candidate, FetchResult(link, 200, body), costs)
     if not posting.employer.strip() or not posting.title.strip():
         raise CheckError(MISSING_COPY, 422)
 
@@ -142,6 +181,7 @@ def read_job(
         requisition_id=posting.requisition_id, url=url,
     )
     if existing is not None:
+        _fill_blanks(session, existing, posting, now)
         return {"status": "duplicate", "job": existing, "truncated": truncated}
 
     job = Job(
@@ -214,6 +254,7 @@ def fit_job(
     now: datetime,
 ) -> FitResult:
     """Judge how well a saved job fits, with the AI behind `step`; the job changes only if the AI answers."""
+    deadline = time.monotonic() + CHECK_BUDGET_SECONDS
     choices = {c["id"] for c in model_choices(settings)}
     if not choices:
         raise StepNotConfiguredError("Connect an AI first.")
@@ -224,7 +265,8 @@ def fit_job(
     provider, model = provider_for_step(settings, step, builder)
     posting = _posting_of(job)
     costs = CostTracker(settings.prices, settings.caps.max_spend_per_run_usd)
-    result = score_job(provider, model, posting, profile, resume, costs)  # may raise: nothing is touched yet
+    # May raise or run out of time: nothing is touched yet.
+    result = _within(deadline, score_job, provider, model, posting, profile, resume, costs)
 
     rules = [r.as_dict() for r in code_rules(posting, profile)] + [d.as_dict() for d in result.deal_breakers]
     kept = [REPOST_FLAG] if REPOST_FLAG in (job.flags or []) else []

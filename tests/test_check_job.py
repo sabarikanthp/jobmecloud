@@ -191,3 +191,38 @@ def test_an_ai_failure_creates_nothing_and_says_so(data_dir):
 def test_empty_input_is_refused(app, raw):
     r = post(app, raw)
     assert r.status_code == 400 and jobs(app) == []
+
+
+def test_a_duplicate_with_no_saved_description_gets_it_from_the_pasted_text(data_dir):
+    app = make(data_dir)
+    job = add_job(app.state.engine, employer="Northwind Labs", title="Senior Data Engineer",
+                  location="Springfield", description=None)
+    r = post(app, POSTING_TEXT).json()
+    assert (r["status"], r["job"]["id"]) == ("duplicate", job)
+    assert "build data pipelines" in jobs(app)[0].description.lower()
+    assert len(jobs(app)) == 1
+
+
+def test_a_known_address_with_no_description_is_still_read_so_it_can_be_filled_in(data_dir):
+    app = make(data_dir)
+    job = add_job(app.state.engine, employer="Elsewhere", title="Other", apply_url=LINK, description=None)
+    r = post(app, LINK).json()
+    assert (r["status"], r["job"]["id"]) == ("duplicate", job)
+    assert len(app.state.provider.calls) == 1 and jobs(app)[0].description
+
+
+def test_very_short_pasted_text_is_refused_and_creates_nothing(app):
+    r = post(app, "Senior Engineer at Acme")
+    assert r.status_code == 422 and "too short" in r.json()["detail"].lower()
+    assert jobs(app) == [] and app.state.provider.calls == []
+
+
+def test_a_slow_ai_answer_is_reported_in_plain_words_and_creates_nothing(data_dir, monkeypatch):
+    import time
+
+    from jobmecloud.jobs import check
+    monkeypatch.setattr(check, "CHECK_BUDGET_SECONDS", 0.3)
+    app = make(data_dir, [lambda kw: (time.sleep(1.5), extract_json())[1]])
+    r = post(app, POSTING_TEXT)
+    assert r.status_code == 504 and "took too long" in r.json()["detail"].lower()
+    assert jobs(app) == []

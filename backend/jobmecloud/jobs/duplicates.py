@@ -24,7 +24,15 @@ def find_duplicate(
     keys = {dedup_key(employer, requisition_id, title, location), fallback_key(employer, title, location)}
     norm_url = normalize_url(url) if url else None
     emp_norm, title_norm = normalize_employer(employer), _words(title)
+    req = (requisition_id or "").strip().lower()
     for other in session.exec(select(Job)):
+        other_req = (other.requisition_id or "").strip().lower()
+        if req and other_req and req != other_req:
+            # Two different requisitions are two different jobs, whatever their titles say; only the same address
+            # can still make them one.
+            if norm_url and other.apply_url and normalize_url(other.apply_url) == norm_url:
+                return other
+            continue
         if keys & {dedup_key(other.employer, other.requisition_id, other.title, other.location),
                    fallback_key(other.employer, other.title, other.location)}:
             return other
