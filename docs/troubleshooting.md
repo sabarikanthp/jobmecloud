@@ -30,6 +30,16 @@ Start with the symptom. If your problem is a lost password or authenticator, go 
 
 **The page is blank, or says it could not read the sign-in settings.** Run `scripts/publish_site.py`; it writes `config.json` into the site. Your browser may be holding an old copy: reload without the cache.
 
+## Your own web address
+
+See [deploy.md](deploy.md), "Optional: use your own address".
+
+**`cdk deploy` fails on the certificate.** The certificate must be in `us-east-1` (CloudFront accepts no other region) and must be **Issued**, not pending: add its validation CNAME at your DNS provider and wait. Pass the full ARN as `certificate_arn`, together with `site_domain`.
+
+**Your address does not load.** Add a CNAME from your hostname to the `DistributionDomain` value in the deploy output. On Cloudflare set it to **DNS only** (grey cloud). Check with `nslookup <your hostname>`; it can take a few minutes.
+
+**Sign-in fails with a `redirect_uri` error on your own address.** The sign-in only knows the addresses from the last deploy. Deploy again with the same `site_domain` and `certificate_arn`.
+
 ## Using the app
 
 **"Couldn't reach JobMeCloud."** Your connection dropped or the API is down. Reload. Check the API function's log group in CloudWatch.
@@ -39,6 +49,8 @@ Start with the symptom. If your problem is a lost password or authenticator, go 
 **A command with a path like `/jobmecloud/...` fails in Git Bash.** Git Bash rewrites it into a Windows path. Run `export MSYS_NO_PATHCONV=1` first, or use PowerShell.
 
 **"Connect an AI first."** Open Settings, your AI connection, paste your API key and press **Test**.
+
+**A web-search run cost more than I expected.** A search run bills the provider's web search by tokens, and the search results are large, so one run can cost $1 to $2. Lower **Searches per run** in Settings (for example to 6), or use [emailed reports](email-ingest.md) instead. See [costs.md](costs.md).
 
 **A run does nothing, or "Add a Tavily or Brave search key".** Only Anthropic's own models can search the web without help. For other providers add a Tavily or Brave key in Settings.
 

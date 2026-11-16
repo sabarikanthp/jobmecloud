@@ -207,6 +207,16 @@ The repo must let a stranger deploy and use it without help:
 - AWS-only new repo (see top), rather than a dual local/AWS codebase.
 - Default CloudFront domain, no custom domain.
 
+## What changed since this was approved (added 2026-11-16)
+
+This design is kept as it was agreed; this note records where the built system differs, and why.
+
+- **Search cost.** Running the AI provider's built-in web search on a schedule cost $0.70 to $2.10 per run, almost all of it input tokens re-read inside a single provider call, and the per-run spending cap is only checked between AI calls. This changed the design: see [the email ingest design](2026-11-16-email-ingest-design.md), which lets another tool do the searching and email JobMeCloud the report. Stage 2 became that feature first.
+- **Lambdas.** Four, not the three described here as stage 1 plus an `ext-api`: `api`, `run-worker`, `docs-worker` and (optional) `ingest`. The `ext-api` (read-only external API) is still not built.
+- **Custom address.** An optional CloudFront hostname and ACM certificate (`site_domain`, `certificate_arn`) were added, with no custom CloudFront error pages (they rewrote API 404s).
+- **Aurora DSQL.** The facts the build depends on were learned against a real cluster: identity columns need `CACHE 1` (or 65,536 and up), no `SAVEPOINT` (so SQLAlchemy's hstore lookup is disabled and the run lock is written without savepoints), optimistic-concurrency retries, at most 3,000 rows per transaction.
+- **Still not built:** SES digest and reminder emails, the tool-using tailoring agent, the read-only external API, Bedrock as a provider.
+
 ## Left to the builder
 
 ASGI adapter choice; exact identity or ID-generation scheme; schema migration tooling; Lambda packaging details; tool descriptions and prompts for the tailoring agent; email templates; frontend sign-in library.

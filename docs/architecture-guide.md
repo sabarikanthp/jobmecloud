@@ -1,10 +1,10 @@
 # How JobMeCloud works: an architecture guide
 
-Written 15 Nov 2026. It follows the code as it is today; where something is not built or not yet proven, it says so. For the hands-on steps see [deploy.md](deploy.md). For the reasoning behind the original design see [the design spec](superpowers/specs/2026-11-14-aws-migration-design.md).
+Updated 16 Nov 2026. It follows the code as it is today; where something is not built or not yet proven, it says so. For the hands-on steps see [deploy.md](deploy.md). For the reasoning behind the original design see [the design spec](superpowers/specs/2026-11-14-aws-migration-design.md).
 
 ## 1. The 60-second answer
 
-JobMeCloud is a job-search assistant that runs entirely in your own AWS account with no server to look after. A React website is served from S3 through CloudFront. A FastAPI app runs inside a Lambda behind API Gateway. Two more Lambdas do the slow work: one runs the search agent, one writes a tailored resume and cover letter. Jobs and history live in Aurora DSQL, files live in S3, API keys live in Parameter Store, sign-in is Cognito with required two-step verification, and EventBridge Scheduler starts the automatic searches. Nothing has a fixed monthly fee, so one person's AWS bill is about $0 to $2. The AI provider is the real cost, and the app caps it.
+JobMeCloud is a job-search assistant that runs entirely in your own AWS account with no server to look after. A React website is served from S3 through CloudFront. A FastAPI app runs inside a Lambda behind API Gateway. Two more Lambdas do the slow work: one runs the search agent, one writes a tailored resume and cover letter. Jobs and history live in Aurora DSQL, files live in S3, API keys live in Parameter Store, sign-in is Cognito with required two-step verification, and EventBridge Scheduler starts the automatic searches. Nothing has a fixed monthly fee, so one person's AWS bill is about $0 to $2. The AI provider is the real cost, and the app caps it. Runs can be started two ways: an AI-driven web search (costly: one run cost $0.70 to $2.10 when measured) or, optionally, a daily report that another tool emails to the app, which the app researches itself (about $0.07 for a one-role report).
 
 The application code is the earlier local JobMe app (one real agent, a plain-code pipeline around it) ported to the cloud. This guide is mostly about what the move to AWS changed.
 
@@ -18,7 +18,7 @@ Three ideas carry the design:
 
 | Term | Plain meaning | Where it is here |
 |---|---|---|
-| Serverless | You upload code and AWS runs it on demand. No machine to patch | All three Lambdas |
+| Serverless | You upload code and AWS runs it on demand. No machine to patch | All the Lambdas |
 | Lambda | A function that runs when called, for up to 15 minutes, then disappears | `handlers/api.py`, `run_worker.py`, `docs_worker.py` |
 | Layer | A shared zip of libraries that several Lambdas attach | `DependenciesLayer`, built by `scripts/build_lambdas.py` |
 | HTTP API | API Gateway's cheap, fast front door | `Edge` in `infra/edge.py` |
@@ -33,6 +33,8 @@ Three ideas carry the design:
 | CDK | Infrastructure written as Python that CloudFormation then applies | `infra/` |
 | Workspace | The S3 prefix `workspace/` mirrored into a Lambda's `/tmp` | `storage/workspace.py` |
 | Dispatcher | Starts long work: a worker Lambda in AWS, a thread on a laptop | `jobs/dispatch.py` |
+| DKIM | A signature a mail provider adds so a receiver can tell a message really came from that domain | `inbound/trust.py` |
+| SES receiving | SES accepting email for an address you own and storing it in a bucket | `infra/inbound.py` |
 | Agent loop | The model chooses tools in a loop until done or a limit is hit | `llm/loop.py` |
 
 ## 3. The big picture
@@ -63,7 +65,7 @@ All of this is created by `cdk deploy` from [`infra/`](../infra). Names are the 
 | Cognito app client | `SpaClient` | Authorization-code flow, no secret, 1 h tokens, 30-day refresh | The browser app |
 | Cognito domain and branding | `LoginDomain` | Managed login (the newer version) | The hosted sign-in page |
 | API Gateway HTTP API | `Api` | Single route `/api/{proxy+}`, JWT authorizer | Front door for the API Lambda |
-| CloudFront distribution | `Distribution` | Default behaviour to S3 via OAC, `/api/*` to API Gateway, caching off for the API | One HTTPS address for site and API |
+| CloudFront distribution | `Distribution` | Default behaviour to S3 via OAC, `/api/*` to API Gateway, caching off for the API; optionally your own hostname and an ACM certificate from `us-east-1` | One HTTPS address for site and API |
 | Scheduler IAM role | `SchedulerRole` | Can invoke only the run worker | What EventBridge Scheduler assumes |
 | AWS Budget | `MonthlyBudget` | $5 monthly, email at 80% actual and 100% forecast | A spending alert, not a spending stop |
 | *Optional:* mail bucket, SES receipt rule set, ingest function | `Inbound` | Private bucket with 30-day expiry, one rule for one address, 512 MB and 10 minutes | Emailed reports ([email-ingest.md](email-ingest.md)) |
@@ -80,16 +82,17 @@ All of this is created by `cdk deploy` from [`infra/`](../infra). Names are the 
 
 ## 5. Map of the code
 
-All Python is under `backend/jobmecloud/`. About 10,000 lines of Python in the backend, 9,000 in the website and 300 of CDK.
+All Python is under `backend/jobmecloud/`. About 11,000 lines of Python in the backend, 9,000 in the website, 460 of CDK and over 100 test files.
 
 | Area | Where | What it does |
 |---|---|---|
-| Lambda entry points | `handlers/` | `api` (Mangum around FastAPI), `run_worker`, `docs_worker`, and `common.bootstrap` |
+| Lambda entry points | `handlers/` | `api` (Mangum around FastAPI), `run_worker`, `docs_worker`, `ingest` (emailed reports), and `common.bootstrap` |
 | Web app | `api/app.py`, `api/routes_*.py` | FastAPI app and one router per area (jobs, runs, settings, schedule, ...) |
 | Database | `db/engine.py`, `migrate.py`, `models.py`, `columns.py`, `retry.py`, `batch.py` | SQLite or DSQL, schema upgrades, key columns, conflict retries, batched writes |
 | Files | `storage/workspace.py`, `storage/sync.py` | S3 to `/tmp` mirror, and the middleware that pulls and pushes it |
 | Secrets | `secrets.py`, `llm/redact.py` | Parameter Store access, and key redaction in logs and errors |
 | Long work | `jobs/dispatch.py`, `jobs/runlock.py` | Starting workers, and the one-run-at-a-time lock |
+| Emailed reports | `inbound/` | Parse and trust-check an email, pick out the recommended roles, record each email's outcome, replay |
 | Scheduling | `scheduling/eventbridge.py`, `api/routes_schedule.py` | Turns your days and times into EventBridge schedules |
 | Search agent | `llm/loop.py`, `agents/jobscout/` | The loop, its tools, and the pipeline around it |
 | Documents | `applydocs/` | Draft, self-check, revise, code check, render |
@@ -195,6 +198,7 @@ What the cloud added around it:
 | Concern | Local app | JobMeCloud |
 |---|---|---|
 | Where it runs | A thread in the app | A 15-minute worker Lambda |
+| Where candidates come from | The search agent | The search agent, or an emailed report that another tool sent (optional) |
 | Time limit | None | Stops starting work with 90 seconds left |
 | Duplicate runs | A lock | The same lock, in DSQL, with a heartbeat |
 | Retries | n/a | Turned off for workers |
@@ -212,18 +216,19 @@ Layers, from the outside in:
 5. **Permissions:** least privilege where practical. The scheduler role can invoke only the run worker. The API can manage only `jobmecloud-run-*` schedules and may pass only the scheduler role. Only the API can write secrets.
 6. **Data:** encrypted at rest and in transit, versions kept on the data bucket, deletion protection on the database and the user pool.
 7. **Output:** keys are redacted from logs. Posting text is untrusted input to the model.
+8. **Inbound mail (optional):** SES accepts mail for one address only, scans it, and the ingest function keeps it only if it is from your one sender with a valid DKIM signature; anything else is deleted at once. Each email is claimed atomically, so a repeat or concurrent delivery does nothing. The report text is untrusted: the AI call that reads it has no tools.
 
 Honest limits are in section 12 and [security.md](security.md).
 
 ## 10. Cost model
 
-About $0 to $2 a month in AWS for one person, mostly free allowances. The AI provider is the real cost: a run reads up to 40 postings. Controls: a spending cap per run (default $2), searches per run (default 20), applications per run (default 10), cheaper models for the high-volume steps, and a $5 budget alert. A budget alerts and does not stop spending. See [costs.md](costs.md) for the per-service table.
+About $0 to $2 a month in AWS for one person, mostly free allowances. The AI provider is the real cost. Measured: a web-search run $0.70 to $2.10 (nearly all of it input tokens, because the search results are large and are re-read inside one provider call), an emailed report about $0.07. Controls: a spending cap per run (default $2), searches per run (default 20), applications per run (default 10), cheaper models for the high-volume steps, and a $5 budget alert. A budget alerts and does not stop spending. See [costs.md](costs.md) for the per-service table.
 
 ## 11. Deploying and operating it
 
 ```
-uv run python scripts/build_lambdas.py     build the layer and three zips (arm64)
-cdk deploy -c owner_email=... -c sender_email=... -c timezone=...
+uv run python scripts/build_lambdas.py     build the layer and four zips (arm64)
+cdk deploy -c owner_email=... -c sender_email=... -c timezone=...    (+ optional -c site_domain, certificate_arn, inbound_address, inbound_sender)
 uv run python scripts/migrate_db.py        create or upgrade tables
 uv run python scripts/create_owner.py --email ...
 (cd frontend && npm run build) && uv run python scripts/publish_site.py
@@ -231,14 +236,18 @@ uv run python scripts/create_owner.py --email ...
 
 - **Updating** repeats those steps. Rebuild and redeploy after any backend change. Skipping that leaves the old code running, which happened during development (see the weak spots).
 - **Coming from the local app:** `scripts/import_local.py` rehearses, then copies your jobs, history, files and settings ([migrating-from-local.md](migrating-from-local.md)).
-- **Logs:** CloudWatch log groups `JobMeCloud-ApiLogs...`, `...RunWorkerLogs...`, `...DocsWorkerLogs...`. Each run also writes a transcript under `logs/` in the data bucket.
+- **Emailed reports:** `scripts/reprocess_email.py --list` shows each email and its status; `--key` replays a waiting or failed one ([email-ingest.md](email-ingest.md)).
+- **Logs:** CloudWatch log groups `JobMeCloud-ApiLogs...`, `...RunWorkerLogs...`, `...DocsWorkerLogs...`, `...IngestLogs...`. Each run also writes a transcript under `logs/` in the data bucket.
 - **Recovery:** [account-recovery.md](account-recovery.md). **Uninstall:** [operations.md](operations.md). Deletion protection and retained buckets mean `cdk destroy` leaves your data until you remove it on purpose.
 - **Deploying with an assistant:** [prompts/deploy-with-an-agent.md](prompts/deploy-with-an-agent.md).
 
 ## 12. Honest weak spots and what is not built
 
 - **Not built yet:** SES digest and reminder emails (outgoing mail is still only sign-in mail), the tool-using tailoring agent, the read-only external API, Bedrock as a model provider.
-- **Not yet proven:** at the time of writing, an AI-powered run on AWS and an unattended scheduled search had not been observed. Sign-in, the database layer, creating a schedule and importing data had each been exercised against real AWS.
+- **Proven on a real account:** sign-in, the database layer, importing data, a schedule firing on its own, an AI web-search run, a custom hostname, and an emailed report from receipt to scored role with written documents. **Not yet observed:** a long unattended stretch of daily emailed reports.
+- **Web-search runs are expensive** (see section 10), and the spending limit is checked between AI calls, so one call can overshoot it. The emailed-report path avoids this by doing no AI search at all.
+- **Inbound email rows are not pruned.** Raw mail expires after 30 days, but the small record of each email stays.
+- **The ingest function connects as the database's admin role**, like every other function.
 - **Every function uses the database's admin role.** The app creates and updates its own tables. A narrower role is planned for the external API.
 - **Anyone with admin access to the AWS account can read everything.** There is no separate encryption layer.
 - **One user, one tab.** Settings and files are shared in S3 and the last write wins. It is not built for teams.
@@ -262,9 +271,9 @@ uv run python scripts/create_owner.py --email ...
 ## 14. One-page cheat sheet
 
 - **Front:** CloudFront, one address. `/` is S3. `/api/*` is API Gateway, which checks the Cognito token.
-- **Code:** API Lambda (512 MB, 30 s). Run worker (1 GB, 15 min, search agent). Docs worker (1 GB, 5 min). All arm64, Python 3.12, one shared layer.
+- **Code:** API Lambda (512 MB, 30 s). Run worker (1 GB, 15 min). Docs worker (1 GB, 5 min). Ingest (512 MB, 10 min, optional). All arm64, Python 3.12, one shared layer.
 - **Data:** Aurora DSQL for rows. S3 `workspace/` for files, mirrored to `/tmp`. Parameter Store `/jobmecloud/` for keys.
-- **Start work:** the API invokes a worker asynchronously. EventBridge Scheduler `jobmecloud-run-HHMM` starts the run worker.
+- **Start work:** the API invokes a worker asynchronously. Optionally, EventBridge Scheduler `jobmecloud-run-HHMM` starts a web-search run, or an emailed report arrives via SES to the ingest function, which starts the run worker.
 - **Safety:** one run at a time (heartbeat lock), no worker retries, 90-second time margin, per-run spending cap, $5 budget alert.
 - **Sign-in:** Cognito, password plus required MFA, no sign-up, recovery by script.
 - **DSQL rules:** IAM token, no savepoints, retry on conflict, 3,000 rows per transaction (batch 500), identity `CACHE 1`.
