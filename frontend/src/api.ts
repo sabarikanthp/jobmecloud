@@ -653,6 +653,50 @@ export const patchJob = (
 export const addJob = (body: { employer: string; title: string; apply_url?: string | null; location?: string | null; notes?: string | null }) =>
   request<{ id: number; status: string }>('/jobs', post(body))
 
+export interface CheckedJob {
+  id: number
+  employer: string
+  title: string
+  status: string
+  match_score: number | null
+  apply_url: string | null
+  allowed_next: string[]
+}
+
+export interface CheckResult {
+  status: 'created' | 'duplicate'
+  truncated: boolean
+  job: CheckedJob
+}
+
+export interface FitChoice {
+  id: string
+  label: string
+  default: boolean
+}
+
+export interface FitResult {
+  score: number
+  cutoff: number
+  above_cutoff: boolean
+  reasons: string
+  gaps: string
+  warnings: string[]
+  rules: { rule: string; passed: boolean; note: string }[]
+  model: string
+  cost_usd: number
+}
+
+export const checkJob = (input: string) => request<CheckResult>('/jobs/check', post({ input }))
+
+export const fitJob = (id: number, model: string) =>
+  request<{ fit: FitResult; job: { id: number; status: string; allowed_next: string[]; match_score: number | null } }>(
+    `/jobs/${id}/fit`,
+    post({ model }),
+  )
+
+export const getFitChoices = async () => (await request<{ choices: FitChoice[] }>('/jobs/check/models')).choices
+
 export const listFollowUps = (params: { bucket?: FollowUpRow['bucket']; job_id?: number; contact_id?: number } = {}) =>
   request<FollowUpRow[]>(`/followups${query(params)}`)
 
