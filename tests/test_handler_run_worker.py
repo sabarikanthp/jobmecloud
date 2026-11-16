@@ -1,10 +1,16 @@
+import json
 from datetime import datetime, timezone
+
+import boto3
+from inbound_fixtures import make_email
 
 from fakes import NOW, FakeProvider, deps, extract_json, rec, score_json, setup_profile, tool_reply
 from sqlmodel import Session, select
 
 from jobmecloud.agents.jobscout.pipeline import STOPPED_EARLY_COPY, execute_run, start_run
-from jobmecloud.db.models import Run
+from jobmecloud.config.profile import SearchProfile, save_search
+from jobmecloud.db.models import Job, Run
+from jobmecloud.inbound import store
 from jobmecloud.handlers import run_worker
 from jobmecloud.jobs.runlock import run_lock_held
 
@@ -78,3 +84,92 @@ def test_pipeline_stops_cleanly_when_time_is_short(data_dir, engine):
     run = execute_run(data_dir, engine, run_id, d, NOW)
     assert run.errors.count(STOPPED_EARLY_COPY) == 1
     assert run.finished_at is not None and run.new == 0 and not run_lock_held(engine, NOW)
+
+
+# ---------------------------------------------------------------- runs started by an email
+
+EMAIL_KEY = "inbound/abc123"
+
+
+def put_email(monkeypatch, body="Strong lead: Northwind Labs https://a.example/1", key=EMAIL_KEY):
+    boto3.client("s3").create_bucket(Bucket="inbox")
+    boto3.client("s3").put_object(Bucket="inbox", Key=key, Body=make_email(text=body))
+    monkeypatch.setenv("JOBMECLOUD_INBOX_BUCKET", "inbox")
+
+
+def roles(*items):
+    return json.dumps({"roles": [
+        {"employer": "Northwind Labs", "title": "Senior Data Engineer", "url": "https://a.example/1",
+         "requisition_id": "", "verdict": "consider", "note": "", **i} for i in items]})
+
+
+def email_run(engine, monkeypatch, provider, *, record=True):
+    monkeypatch.setattr(run_worker, "build_deps", lambda context: deps(provider))
+    now = datetime.now(timezone.utc)
+    if record:
+        store.record_received(engine, EMAIL_KEY, "sender@example.com", now)
+    run_id = start_run(engine, "email", now)
+    run_worker.handler({"task": "run", "run_id": run_id, "email_key": EMAIL_KEY}, Ctx())
+    with Session(engine) as s:
+        return s.get(Run, run_id)
+
+
+def test_email_event_runs_the_run_with_candidates_from_the_email(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    put_email(monkeypatch)
+    p = FakeProvider(replies=[roles({}), extract_json(), score_json(90)])
+    run = email_run(engine, monkeypatch, p)
+    assert run.trigger == "email" and run.finished_at is not None and (run.found, run.matched) == (1, 1)
+    with Session(engine) as s:
+        assert s.exec(select(Job)).one().origin == "email"
+    assert p.replies == []
+
+
+def test_inbound_row_is_marked_done_after_a_good_run(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    put_email(monkeypatch)
+    email_run(engine, monkeypatch, FakeProvider(replies=[roles({}), extract_json(), score_json(90)]))
+    assert store.get_by_key(engine, EMAIL_KEY).status == store.DONE
+
+
+def test_unreadable_email_object_fails_the_run_clearly_and_marks_the_row_failed(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    boto3.client("s3").create_bucket(Bucket="inbox")
+    monkeypatch.setenv("JOBMECLOUD_INBOX_BUCKET", "inbox")  # nothing stored under the key
+    run = email_run(engine, monkeypatch, FakeProvider())
+    assert run.finished_at is not None and any("could not be read" in e for e in run.errors)
+    row = store.get_by_key(engine, EMAIL_KEY)
+    assert row.status == store.FAILED and "could not be read" in row.note
+    assert not run_lock_held(engine, datetime.now(timezone.utc))
+
+
+def test_dropped_roles_are_summarised_in_the_run_errors(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    put_email(monkeypatch)
+    p = FakeProvider(replies=[roles({}, {"url": "", "employer": "Contoso", "title": "Lead"}), extract_json(), score_json(90)])
+    run = email_run(engine, monkeypatch, p)
+    assert run.found == 1 and any("1 recommended role had no usable link" in e for e in run.errors)
+
+
+def test_failed_setup_check_closes_the_run_gives_the_lock_back_and_marks_the_row_failed(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    save_search(data_dir, SearchProfile(target_roles=[]))
+    put_email(monkeypatch)
+    run = email_run(engine, monkeypatch, FakeProvider())
+    assert run.finished_at is not None and run.errors == ["Add at least one job title in What you're looking for."]
+    assert store.get_by_key(engine, EMAIL_KEY).status == store.FAILED
+    assert not run_lock_held(engine, datetime.now(timezone.utc))
+
+
+def test_lock_is_released_after_a_good_email_run(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    put_email(monkeypatch)
+    email_run(engine, monkeypatch, FakeProvider(replies=[roles({}), extract_json(), score_json(90)]))
+    assert not run_lock_held(engine, datetime.now(timezone.utc))
+
+
+def test_email_run_without_a_recorded_row_still_works(data_dir, engine, monkeypatch):
+    setup_profile(data_dir)
+    put_email(monkeypatch)
+    run = email_run(engine, monkeypatch, FakeProvider(replies=[roles({}), extract_json(), score_json(90)]), record=False)
+    assert run.found == 1 and store.get_by_key(engine, EMAIL_KEY) is None
