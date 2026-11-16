@@ -224,6 +224,10 @@ Honest limits are in section 12 and [security.md](security.md).
 
 About $0 to $2 a month in AWS for one person, mostly free allowances. The AI provider is the real cost. Measured: a web-search run $0.70 to $2.10 (nearly all of it input tokens, because the search results are large and are re-read inside one provider call), an emailed report about $0.07. Controls: a spending cap per run (default $2), searches per run (default 20), applications per run (default 10), cheaper models for the high-volume steps, and a $5 budget alert. A budget alerts and does not stop spending. See [costs.md](costs.md) for the per-service table.
 
+### Checking a job
+
+The API Lambda has three routes for this: `POST /api/jobs/check` reads pasted text or a link (a link is fetched with a 10 second limit, never for private or LinkedIn addresses) and saves a New job; `GET /api/jobs/check/models` lists the connected AIs, scoring model first; `POST /api/jobs/{id}/fit` judges a saved job with the chosen one. Reading uses the extraction step and judging the scoring code a run uses. Neither call has tools, so pasted text cannot make the app do anything. The job is saved before judging, and a failed judgment changes nothing. One duplicate finder serves this and Add a job. Guide: [check-a-job.md](check-a-job.md).
+
 ## 11. Deploying and operating it
 
 ```

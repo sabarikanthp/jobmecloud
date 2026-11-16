@@ -57,6 +57,10 @@ A budget alerts you, it does not stop spending. If you see an alert you did not 
 
 If you use [email-ingest.md](email-ingest.md), SES charges a very small amount per received email, and the AI provider charges for one small call to read each report plus one per role. This usually replaces the much larger cost of a paid web search per run.
 
+## Checking a job
+
+Checking a job you pasted makes two small AI calls, one to read it and one to judge the fit, usually a cent or two together. The cost is shown beside each fit and recorded in the job's history. A stronger model costs more; the default is your scoring model. See [check-a-job.md](check-a-job.md).
+
 ## Things that would add cost
 
 - Using your own web address. The certificate and the CloudFront hostname are free, and so are Cloudflare's DNS records. A domain name costs roughly a dozen dollars a year if you do not already own one, and hosting its DNS in Route 53 is about $0.50 a month. The default `*.cloudfront.net` address is free.
