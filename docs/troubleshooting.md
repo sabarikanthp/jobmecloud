@@ -34,6 +34,10 @@ Start with the symptom. If your problem is a lost password or authenticator, go 
 
 **"Couldn't reach JobMeCloud."** Your connection dropped or the API is down. Reload. Check the API function's log group in CloudWatch.
 
+**A page shows "Something went wrong (error 500)".** Open the API's log group (see [operations.md](operations.md)). If you see `unsupported transaction statement: SAVEPOINT`, the deployed functions are running an older build than your code. Run `uv run python scripts/build_lambdas.py` and `cdk deploy` again, then reload.
+
+**A command with a path like `/jobmecloud/...` fails in Git Bash.** Git Bash rewrites it into a Windows path. Run `export MSYS_NO_PATHCONV=1` first, or use PowerShell.
+
 **"Connect an AI first."** Open Settings, your AI connection, paste your API key and press **Test**.
 
 **A run does nothing, or "Add a Tavily or Brave search key".** Only Anthropic's own models can search the web without help. For other providers add a Tavily or Brave key in Settings.

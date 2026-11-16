@@ -11,7 +11,7 @@ If anything goes wrong, see [troubleshooting.md](troubleshooting.md). If you eve
 
 ## 2. Set a billing alert
 
-Do this before you deploy anything. In the console open **Billing and Cost Management**, then **Budgets**, then **Create budget**, choose **Monthly cost budget**, set **$5**, and enter your email for alerts. (The stack also creates its own $5 budget, so this is a second safety net while you set up. See [costs.md](costs.md).)
+Do this before you deploy anything. In the console open **Billing and Cost Management**, then **Budgets**, then **Create budget**, choose **Monthly cost budget**, set **$5**, and enter your email for alerts. Click the confirmation link AWS emails you (check spam and, on Gmail, the Promotions tab). The stack also creates its own $5 budget, so once it is deployed you can delete this hand-made one. AWS gives you two budgets free; if you have other projects in the account, count them first ([costs.md](costs.md)).
 
 ## 3. Create an admin user (not the root user)
 
@@ -35,6 +35,8 @@ If you would rather use a classic IAM user: create a user with the `Administrato
 | AWS CDK | Creates the AWS resources | `npm install -g aws-cdk` |
 
 Check them: `aws --version` (must say `aws-cli/2`), `uv --version`, `node --version`, `cdk --version`.
+
+**Windows notes.** If `aws --version` says `aws-cli/1`, an old copy is earlier on your PATH. Open a new terminal, or call the new one by its full path (`C:\Program Files\Amazon\AWSCLIV2\aws.exe`). If the installer fails with error 1618, another install is running: wait for it or restart. In **Git Bash**, an argument that starts with `/` (such as a Parameter Store name like `/jobmecloud/...`) is rewritten into a Windows path; run `export MSYS_NO_PATHCONV=1` first, or use PowerShell.
 
 ## 5. Sign the CLI in to your account
 
@@ -69,7 +71,7 @@ AWS only sends email from addresses you have verified, and a new account starts 
 
 1. In the console, in your chosen region, open **Amazon SES**, then **Identities**, then **Create identity**.
 2. Choose **Email address**, enter the address you will sign in with, and create it.
-3. Open the email AWS sends and click the link. The identity must say **Verified** before you continue.
+3. Open the email AWS sends and click the link (check spam and, on Gmail, Promotions). The identity must say **Verified** before you continue.
 
 Sign-in invitations and MFA codes are sent from this address. If you use a different address for sending (`sender_email` below), verify that one too.
 
@@ -118,6 +120,8 @@ uv run python scripts/publish_site.py
 
 It prints your site address (the `SiteUrl`).
 
+**Check the backend is live.** After the first sign-in (next step) open the **Jobs** page. If it shows an error, the running functions are older than your code: repeat `build_lambdas.py` and `cdk deploy`, then reload. The same rule applies after any code change.
+
 ## 14. Sign in and set up two-step verification
 
 1. Open the site address. You are sent to the sign-in page.
@@ -134,6 +138,10 @@ Follow the setup guide in the app. In the **Connect an AI** step choose Anthropi
 Searches need a web-search source. With Anthropic the built-in web search is used. With other providers, add a Tavily or Brave search key in Settings.
 
 Set the **spending limit per run** in Settings (the default is $2) so one run can never cost more than you expect.
+
+## Prefer plain CloudFormation?
+
+The infrastructure is written with the AWS CDK in [`infra/`](../infra). CDK turns it into a CloudFormation template for you: `cdk synth` writes it to `cdk.out/` (ignored by git, because it contains your account number). That template refers to the Lambda code CDK uploads to the bootstrap bucket, so it cannot be deployed on its own with the CloudFormation console. Use `cdk deploy`, or run `cdk synth` and read the template if you want to review what will be created.
 
 ## You are done
 

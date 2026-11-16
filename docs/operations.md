@@ -12,7 +12,7 @@ uv run python scripts/migrate_db.py
 uv run python scripts/publish_site.py
 ```
 
-Use the same `-c` values you deployed with. `cdk deploy` shows a summary of what will change and asks before applying it; read it. `migrate_db.py` is safe to repeat: it only adds what is missing. The release notes say if anything needs more than this.
+Always rebuild and redeploy after changing backend code: the old functions keep running until you do. Use the same `-c` values you deployed with. `cdk deploy` shows a summary of what will change and asks before applying it; read it. `migrate_db.py` is safe to repeat: it only adds what is missing. The release notes say if anything needs more than this.
 
 ## Backups
 
@@ -24,7 +24,7 @@ Use the same `-c` values you deployed with. `cdk deploy` shows a summary of what
 
 | Thing | Where to look |
 |---|---|
-| Logs | CloudWatch, log groups named after the functions (`...ApiFunction...`, `...RunWorkerFunction...`, `...DocsWorkerFunction...`). Kept 14 days |
+| Logs | CloudWatch log groups named `<stack>-ApiLogs...`, `<stack>-RunWorkerLogs...` and `<stack>-DocsWorkerLogs...` (not `/aws/lambda/...`; list them with `aws logs describe-log-groups`). Kept 14 days |
 | A run's step-by-step record | The `logs/` folder in the data bucket (one file per run) |
 | The schedule | EventBridge, **Scheduler**, schedules named `jobmecloud-run-HHMM` (change them in Settings, not here) |
 | Spending | Billing and Cost Management, Budgets and Cost Explorer ([costs.md](costs.md)) |

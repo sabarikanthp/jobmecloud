@@ -28,7 +28,9 @@ HOW TO WORK
 5. NEVER use the AWS root user for anything except the first sign-in and turning on its two-step verification. Never create access keys for the root user. Prefer IAM Identity Center (short-lived logins) over long-lived access keys.
 6. Never print or log secrets. Never put my email, account number or keys into files that are committed to git. Use placeholders in anything you write to the repo.
 7. If a check fails, stop and diagnose before retrying. Do not retry blindly, and do not loosen permissions or skip a check to get past a failure. Tell me what you think went wrong in plain words.
-8. Keep a running list called FRICTION LOG: anything that was confusing, missing from the docs, wrong in the docs, or slower than the docs say. Show it to me at the end.
+8. Windows: the AWS CLI must be v2 (an old v1 earlier on PATH is common; call v2 by its full path if needed). In Git Bash set MSYS_NO_PATHCONV=1 before any AWS command with an argument that starts with "/", or use PowerShell. The CDK is a Node program: run `cdk ...` directly; it is not started through uv.
+9. Emails (budget confirmation, SES verification, temporary password) can land in spam or Gmail's Promotions tab; say so when you ask me to look for them.
+10. Keep a running list called FRICTION LOG: anything that was confusing, missing from the docs, wrong in the docs, or slower than the docs say. Show it to me at the end.
 
 THE STEPS (in order; confirm each with a check)
 0. Look around. Run: git status, uv --version, node --version, aws --version, cdk --version. Tell me which tools are missing or too old (the AWS CLI must be version 2; Node must be a current LTS). Ask which region I want (default us-east-1) and which email address I will sign in with.
@@ -42,12 +44,13 @@ THE STEPS (in order; confirm each with a check)
 8. SES. Walk me through verifying my email address as an SES identity in my region (this one is mine). Check it with `aws ses get-identity-verification-attributes` or the SES v2 equivalent and confirm the status is Success/Verified.
 9. CDK bootstrap. Explain what it creates, then run `cdk bootstrap`.
 10. Build and preview. Run `uv run python scripts/build_lambdas.py`. Then run `cdk diff -c owner_email=<me> -c sender_email=<me> -c timezone=<my IANA time zone>` and explain in plain words what will be created and what it costs (docs/costs.md). Ask for my go-ahead.
-11. Deploy. Run `cdk deploy ...` with the same -c values. Show progress in plain words. After it finishes, read the stack outputs and check the Budgets email confirmation (this one is mine).
+11. Deploy. Run `cdk deploy ...` with the same -c values. Show progress in plain words. After it finishes, read the stack outputs and check the Budgets email confirmation (this one is mine). The stack creates its own $5 budget, so tell me I may delete the hand-made one from step 2, after counting my budgets (the first two are free).
 12. Database. Run `uv run python scripts/migrate_db.py`. Then, only if I agree, run the DSQL integration test: `JOBMECLOUD_DB_URL=dsql://<DatabaseEndpoint output> uv run pytest -m dsql -q`. Report exactly what passed or failed. This is the first real test of the database layer, so report every error in full.
 13. Sign-in account. Run `uv run python scripts/create_owner.py --email <me>`. Tell me to look for the temporary-password email (check spam).
-14. Website. Run `cd frontend && npm run build`, then `uv run python scripts/publish_site.py`. Give me the site address.
+14. Website. Run `cd frontend && npm run build`, then `uv run python scripts/publish_site.py`. Give me the site address. After step 15, have me open the Jobs page: if it shows an error, read the API log group (`aws logs describe-log-groups` lists them) and fix the cause. A stale build means rebuilding with build_lambdas.py and running cdk deploy again.
 15. First sign-in (this one is mine). Walk me through: open the site, sign in with the temporary password, choose a new password, set up my authenticator app AND the email code if offered. Read docs/account-recovery.md with me and make sure I understand how recovery works.
 16. First run (this one is mine, in the app). Tell me to follow the setup guide in the site, paste my AI provider key into the app, and press Run now. Then check the run worker's CloudWatch logs for errors and tell me what you see.
+16b. Coming from the local JobMe app? Read docs/migrating-from-local.md with me. Run `scripts/import_local.py --from <folder>` as a rehearsal first, show me the counts, and run it with --apply only after I agree. Offer --copy-api-key only if I ask for it; never display a key. Then help me save my schedule in Settings and verify it with `aws scheduler list-schedules`.
 17. Wrap up. Show the FRICTION LOG. Remind me of the monthly cost expectation, the budget alert, and where to find account recovery. Ask whether I want you to turn the FRICTION LOG into fixes for the docs.
 
 STOP AND ASK if: a command would delete something, an AWS action would cost more than a few cents, something looks like it is in the wrong AWS account, or I seem stuck.
