@@ -116,3 +116,23 @@ def test_run_now_that_cannot_reach_the_worker_gives_the_lock_back(client):
     assert latest["running"] is False and latest["errors"] == ["The run could not be started. Please try again."]
     client.app.state.dispatcher = Recording()
     assert client.post("/api/runs").status_code == 202  # a new run can start straight away
+
+
+def test_make_docs_passes_the_chosen_resume_to_the_worker(client):
+    ready_profile(client.app.state.data_dir)
+    from jobmecloud.resumes.store import default_entry
+    resume_id = default_entry(client.app.state.data_dir).id
+    job_id = add_job(client.app.state.engine, status="New", match_score=90)
+    client.app.state.dispatcher = Recording()
+    r = client.post(f"/api/jobs/{job_id}/docs", json={"resume_id": resume_id})
+    assert r.status_code == 202
+    assert client.app.state.dispatcher.docs == [(job_id, {"feedback": None, "resume_id": resume_id})]
+
+
+def test_make_docs_refuses_a_resume_that_is_not_in_the_library_before_dispatch(client):
+    ready_profile(client.app.state.data_dir)
+    job_id = add_job(client.app.state.engine, status="New", match_score=90)
+    client.app.state.dispatcher = Recording()
+    r = client.post(f"/api/jobs/{job_id}/docs", json={"resume_id": "nope"})
+    assert r.status_code == 400 and "library" in r.json()["detail"].lower()
+    assert client.app.state.dispatcher.docs == []

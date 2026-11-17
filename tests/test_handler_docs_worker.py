@@ -63,3 +63,22 @@ def test_docs_worker_reports_a_run_in_progress(data_dir, engine, monkeypatch):
 
     job = job_of(engine, job_id)
     assert job.docs_status == "error" and job.docs_error == "A run is already in progress."
+
+
+def test_docs_worker_starts_from_the_resume_it_was_told_to_use(data_dir, engine, monkeypatch):
+    from docx_fixtures import FIXTURE_READING, make_resume_docx
+    from fakes import NOW, fixture_mapping
+    from jobmecloud.resumes.store import add_resume
+    boto3.client("s3").create_bucket(Bucket="jobmecloud-docs-test2")
+    monkeypatch.setenv("JOBMECLOUD_BUCKET", "jobmecloud-docs-test2")
+    monkeypatch.setenv("JOBMECLOUD_PREFIX", "ws")
+    ready_profile(data_dir)
+    other = FIXTURE_READING.model_copy(update={"summary": "THE OTHER RESUME SUMMARY"})
+    chosen = add_resume(data_dir, name="Other", filename="o.docx", data=make_resume_docx(), reading=other,
+                        mapping=fixture_mapping(), make_default=False, now=NOW)
+    job_id = add_job(engine, status="New", match_score=90)
+    provider = FakeProvider(replies=[draft_json_for_fixture(), '{"problems": []}'])
+    monkeypatch.setattr(docs_worker, "build_deps", lambda context: deps(provider, page_counter=lambda data: 1))
+    docs_worker.handler({"task": "docs", "job_id": job_id, "options": {"resume_id": chosen.id}}, Ctx())
+    assert job_of(engine, job_id).docs_status == "ready"
+    assert "THE OTHER RESUME SUMMARY" in provider.calls[0]["messages"][0]["content"]

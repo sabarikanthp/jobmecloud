@@ -13,14 +13,17 @@ export default function MakeDocsButton({
 }) {
   const [error, setError] = useState('')
   const [stale, setStale] = useState(false)
+  const [done, setDone] = useState(false)
   const mine = busyId === job.id
   const shown = error || job.docs_error || ''
 
   async function go() {
     setError('')
     setStale(false)
+    setDone(false)
     const out = await runDocs(job.id, () => makeDocs(job.id))
     if (out.error) setError(out.error)
+    else setDone(true)
     setStale(out.stale)
   }
 
@@ -32,6 +35,7 @@ export default function MakeDocsButton({
       {mine && (
         <p className="help" role="status">Writing documents… this can take a minute.</p>
       )}
+      {done && !error && <p className="result ok" role="status">New resume and cover letter created.</p>}
       {stale && !error && <p className="help">{STALE_NOTE}</p>}
       {shown && <div className="result bad">{shown}</div>}
     </>

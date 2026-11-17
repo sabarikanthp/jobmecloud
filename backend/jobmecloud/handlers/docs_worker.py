@@ -46,10 +46,12 @@ def _finish(engine, job_id: int, status: str, error: str | None) -> None:
 def handler(event: dict, context) -> None:
     data_dir, engine, workspace = bootstrap()
     job_id = int(event["job_id"])
-    feedback = (event.get("options") or {}).get("feedback")
+    options = event.get("options") or {}
+    feedback, resume_id = options.get("feedback"), options.get("resume_id")
     try:
         try:
-            generate_with_lock(data_dir, engine, build_deps(context), job_id, feedback, datetime.now(timezone.utc))
+            generate_with_lock(data_dir, engine, build_deps(context), job_id, feedback, datetime.now(timezone.utc),
+                               resume_id)
             _finish(engine, job_id, "ready", None)
         except RunInProgressError:
             _finish(engine, job_id, "error", IN_PROGRESS_COPY)

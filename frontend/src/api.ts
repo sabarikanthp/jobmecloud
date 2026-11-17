@@ -431,10 +431,10 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // In AWS the documents are written by a background worker: start it, then wait for it to finish.
 // Locally the server writes them during the request and answers with the result straight away.
-export async function makeDocs(id: number, feedback?: string | null): Promise<DocsResult> {
+export async function makeDocs(id: number, feedback?: string | null, resumeId?: string | null): Promise<DocsResult> {
   const first = await request<DocsResult | { status: string }>(`/jobs/${id}/docs`, {
     method: 'POST',
-    body: JSON.stringify({ feedback: feedback ? feedback : null }),
+    body: JSON.stringify({ feedback: feedback ? feedback : null, ...(resumeId ? { resume_id: resumeId } : {}) }),
   })
   if (!('status' in first)) return first
   const deadline = Date.now() + DOCS_GIVE_UP_MS

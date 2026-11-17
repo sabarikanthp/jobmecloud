@@ -126,3 +126,35 @@ def write_notes_md(folder: Path, job: Job, *, changes: list[str], check_notes: l
     lines += [f"- {c}" for c in check_notes] or ["None"]
     lines += ["", "## Page count", "", page_note, "", "## Gaps to prepare for", "", job.gaps or "None", ""]
     (folder / "notes.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+# Words that end a company name without being the name ("Initech Health" is "Initech" on a file).
+_COMPANY_TAIL = {"inc", "llc", "ltd", "corp", "corporation", "co", "company", "plc", "lp", "group", "holdings",
+                 "health", "healthcare", "financial", "international", "technologies", "technology"}
+_TITLE_WORDS = 4
+
+
+def _words(text: str) -> list[str]:
+    return [w for w in re.split(r"[^A-Za-z0-9]+", text or "") if w]
+
+
+def _camel(words: list[str]) -> str:
+    return "".join(w if w[0].isupper() else w[0].upper() + w[1:] for w in words)
+
+
+def document_filename(person: str, employer: str, title: str, kind: str, suffix: str) -> str:
+    """The name a downloaded resume or cover letter is saved under, e.g. Jordan_Example_Initech_LeadDirector.docx."""
+    company_words = _words(employer)
+    while len(company_words) > 1 and company_words[-1].lower() in _COMPANY_TAIL:
+        company_words.pop()
+    parts = [*_words(person)]
+    if company_words:
+        parts.append(_camel(company_words))
+    title_words = _words(title)[:_TITLE_WORDS]
+    if title_words:
+        parts.append(_camel(title_words))
+    if not parts:
+        return ("Cover_Letter" if kind == "cover_letter" else "Resume") + suffix
+    if kind == "cover_letter":
+        parts.append("Cover")
+    return "_".join(parts)[:80].rstrip("_") + suffix

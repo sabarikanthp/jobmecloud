@@ -39,7 +39,9 @@ def test_download_returns_a_short_lived_link_to_the_file(cloud_client):
     assert r.status_code == 200
     body = r.json()
     assert "ws/applications/Acme/resume.docx" in body["url"].replace("%2F", "/") and "Expires=" in body["url"]
-    assert body["filename"] == "resume.docx"
+    assert body["filename"] == "Jordan_Example_NorthwindLabs_SeniorDataEngineer.docx"
+    assert "response-content-disposition" in body["url"].lower()
+    assert "Jordan_Example_NorthwindLabs_SeniorDataEngineer.docx" in body["url"]
 
 
 def test_download_missing_file_is_404(cloud_client):
