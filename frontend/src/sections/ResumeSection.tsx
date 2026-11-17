@@ -17,6 +17,7 @@ import {
 } from '../api.ts'
 import SectionCard, { type SectionMode } from '../components/SectionCard.tsx'
 import MappingReview from './resume/MappingReview.tsx'
+import AddResumeFolder from './resume/AddResumeFolder.tsx'
 import RoleEditor from './resume/RoleEditor.tsx'
 import { CertificationEditor, EducationEditor } from './resume/SmallRows.tsx'
 import { blankCert, blankEdu, blankRole, fromForm, toForm, type ResumeForm } from './resume/form.ts'
@@ -278,6 +279,13 @@ export default function ResumeSection({ mode, onSaved }: { mode: SectionMode; on
                 {(defaultResume || phase2) && <button onClick={() => void editReading()}>Edit what JobMe read</button>}
               </div>
               <span className="help">Word, PDF, text or Markdown files work.</span>
+              <AddResumeFolder
+                existingNames={resumes.map((r) => r.name)}
+                onDone={async () => {
+                  await refresh()
+                  await onSaved?.()
+                }}
+              />
             </>
           )}
           {uploadError && <div className="result bad">{uploadError}</div>}

@@ -87,7 +87,8 @@ class Workspace:
         self._save_manifest()
         return pushed
 
-    def presign(self, relative_key: str, expires: int = 900) -> str:
-        return self._s3.generate_presigned_url(
-            "get_object", Params={"Bucket": self.bucket, "Key": self._key(relative_key)}, ExpiresIn=expires
-        )
+    def presign(self, relative_key: str, expires: int = 900, download_name: str | None = None) -> str:
+        params = {"Bucket": self.bucket, "Key": self._key(relative_key)}
+        if download_name:  # the browser saves the file under this name instead of the stored one
+            params["ResponseContentDisposition"] = f'attachment; filename="{download_name}"'
+        return self._s3.generate_presigned_url("get_object", Params=params, ExpiresIn=expires)

@@ -38,7 +38,14 @@ from jobmecloud.jobs.tracking import change_status, log
 from jobmecloud.llm.pricing import CostTracker
 from jobmecloud.llm.types import Provider
 from jobmecloud.resumes.mapping import ResumeMapping, keys_match
-from jobmecloud.resumes.store import ResumeEntry, default_entry, file_path, get_entry, load_mapping
+from jobmecloud.resumes.store import (
+    ResumeEntry,
+    default_entry,
+    file_path,
+    get_entry,
+    load_mapping,
+    load_reading,
+)
 
 NO_RESUME_COPY = "Add your resume in Settings > Your resume to get documents."
 PLAIN_LAYOUT_NOTE = "Your default resume isn't a Word file, so JobMe used a plain layout."
@@ -50,6 +57,7 @@ STALE_MAPPING_COPY = (
     "The resume file no longer matches its mapping. Check the mapping again in Settings > Your resume."
 )
 MISSING_FILE_COPY = "That resume's file is missing. Add it again in Settings > Your resume."
+NO_SUCH_RESUME_COPY = "That resume is no longer in your library. Pick another one."
 STAGE_WRITING = "Writing documents ({i} of {n})"
 
 
@@ -97,9 +105,10 @@ def make_docs(
     counter: PageCounter,
     now: datetime,
     feedback: str | None = None,
+    resume_id: str | None = None,
 ) -> DocsResult:
     today = now.astimezone().date()
-    inputs = _load_inputs(data_dir, engine, job_id)
+    inputs = _load_inputs(data_dir, engine, job_id, resume_id)
     draft, problems = _draft(provider, model, inputs, costs, feedback)
     draft, check_notes = code_check(draft, inputs.resume, inputs.profile, inputs.headline)
     rendered = _render(inputs, draft, counter, today)
@@ -145,10 +154,18 @@ def _load_job(engine: Engine, job_id: int) -> Job:
         return job
 
 
-def _load_inputs(data_dir: Path, engine: Engine, job_id: int) -> _Inputs:
+def _load_inputs(data_dir: Path, engine: Engine, job_id: int, resume_id: str | None = None) -> _Inputs:
+    """The job, and the resume to start from: the one asked for, else the default."""
     job = _load_job(engine, job_id)
-    entry = default_entry(data_dir)
-    resume = load_resume(data_dir)
+    if resume_id:
+        try:
+            entry = get_entry(data_dir, resume_id)
+            resume = load_reading(data_dir, resume_id)
+        except (KeyError, OSError):
+            raise DocsSetupError(NO_SUCH_RESUME_COPY) from None
+    else:
+        entry = default_entry(data_dir)
+        resume = load_resume(data_dir)
     if entry is None or resume is None:
         raise DocsSetupError(NO_RESUME_COPY)
     template, mapping = None, None
