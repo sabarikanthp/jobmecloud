@@ -1,6 +1,6 @@
 # How JobMeCloud works: an architecture guide
 
-Updated 16 Nov 2026. It follows the code as it is today; where something is not built or not yet proven, it says so. For the hands-on steps see [deploy.md](deploy.md). For the reasoning behind the original design see [the design spec](superpowers/specs/2026-11-14-aws-migration-design.md).
+Updated 17 Nov 2026. It follows the code as it is today; where something is not built or not yet proven, it says so. For the hands-on steps see [deploy.md](deploy.md). For the reasoning behind the original design see [the design spec](superpowers/specs/2026-11-14-aws-migration-design.md).
 
 ## 1. The 60-second answer
 
@@ -82,7 +82,7 @@ All of this is created by `cdk deploy` from [`infra/`](../infra). Names are the 
 
 ## 5. Map of the code
 
-All Python is under `backend/jobmecloud/`. About 11,000 lines of Python in the backend, 9,000 in the website, 460 of CDK and over 100 test files.
+All Python is under `backend/jobmecloud/`. About 11,500 lines of Python in the backend, 10,000 in the website, 430 of CDK and about 100 test files.
 
 | Area | Where | What it does |
 |---|---|---|
@@ -92,6 +92,8 @@ All Python is under `backend/jobmecloud/`. About 11,000 lines of Python in the b
 | Files | `storage/workspace.py`, `storage/sync.py` | S3 to `/tmp` mirror, and the middleware that pulls and pushes it |
 | Secrets | `secrets.py`, `llm/redact.py` | Parameter Store access, and key redaction in logs and errors |
 | Long work | `jobs/dispatch.py`, `jobs/runlock.py` | Starting workers, and the one-run-at-a-time lock |
+| Check a job | `jobs/check.py`, `jobs/duplicates.py`, `api/routes_check.py` | Read pasted text or a link, find duplicates, judge the fit |
+| Job status | `jobs/tracking.py`, `jobs/status.py` | Which moves each status allows, and the history written for each |
 | Emailed reports | `inbound/` | Parse and trust-check an email, pick out the recommended roles, record each email's outcome, replay |
 | Scheduling | `scheduling/eventbridge.py`, `api/routes_schedule.py` | Turns your days and times into EventBridge schedules |
 | Search agent | `llm/loop.py`, `agents/jobscout/` | The loop, its tools, and the pipeline around it |
@@ -99,7 +101,7 @@ All Python is under `backend/jobmecloud/`. About 11,000 lines of Python in the b
 | Providers | `llm/*_provider.py`, `factory.py`, `steps.py`, `pricing.py` | Anthropic and OpenAI-compatible adapters, per-step model choice, cost cap |
 | Admin scripts | `admin/`, `scripts/` | Build, migrate, create or reset the owner, publish the site, import local data |
 | Infrastructure | `infra/` | The CDK app: stack, auth, edge |
-| Website | `frontend/src/` | React, PKCE sign-in in `auth.ts`, API client in `api.ts` |
+| Website | `frontend/src/` | React, PKCE sign-in in `auth.ts`, API client in `api.ts`, the menu count in `followUps.ts`, the Check a job panel in `components/CheckJobPanel.tsx` |
 
 Reading order for the cloud parts: `db/engine.py`, `storage/workspace.py`, `handlers/common.py`, `handlers/run_worker.py`, `jobs/dispatch.py`, `jobs/runlock.py`, then `infra/jobmecloud_stack.py`.
 
@@ -155,6 +157,18 @@ Only the source of candidates differs. Everything after it, including the single
 ### "Make docs"
 
 The API starts the docs worker and returns 202. The page polls `/api/jobs/<id>/docs/status` until the job's `docs_status` is `ready` or `error`, giving up after six minutes. The worker takes the same lock, so documents and a run never overlap. Files are written into the workspace, pushed to S3, and downloaded through a link that expires in 15 minutes.
+
+### Checking a job
+
+The API Lambda has three routes for this: `POST /api/jobs/check` reads pasted text or a link (a link is fetched with a 10 second limit, never for private or LinkedIn addresses) and saves a New job; `GET /api/jobs/check/models` lists the connected AIs, scoring model first; `POST /api/jobs/{id}/fit` judges a saved job with the chosen one. Reading uses the extraction step and judging uses the scoring code a run uses. Neither call has tools, so pasted text cannot make the app do anything. The job is saved before judging, and a failed judgment changes nothing. One duplicate finder (`jobs/duplicates.py`) serves this and Add a job: the same requisition, the same employer and title, or the same address is the same job, and two different requisitions never are. A duplicate that was added without details (an import, or by hand) learns them from the pasted posting. Because the API function stops at 30 seconds, the fetch and the AI call share a 24 second budget and end in a plain "took too long" message rather than being cut off. Guide: [check-a-job.md](check-a-job.md).
+
+### The Follow-ups number
+
+`GET /api/followups/counts` returns how many follow-ups are overdue and due today, using the app's own idea of today. The menu shows the total beside **Follow-ups** (red when anything is overdue). The website refreshes it on load, on every page change, when the window regains focus, every five minutes, and a moment after any successful change, which the API client announces with a browser event.
+
+### Status
+
+A job's status moves by rules in `jobs/tracking.py`, which also says which moves each status allows. People set Applied, Interviewing, Offer, Accepted, Rejected, Withdrawn, Skipped and Unavailable (gone, or not one you can pursue). The app itself only ever sets New, Ready and Closed. Reopen returns a finished job to New or Ready. The Jobs list and the job page both read the allowed moves from the server, so they never disagree.
 
 ### Files: the workspace pattern
 
@@ -224,10 +238,6 @@ Honest limits are in section 12 and [security.md](security.md).
 
 About $0 to $2 a month in AWS for one person, mostly free allowances. The AI provider is the real cost. Measured: a web-search run $0.70 to $2.10 (nearly all of it input tokens, because the search results are large and are re-read inside one provider call), an emailed report about $0.07. Controls: a spending cap per run (default $2), searches per run (default 20), applications per run (default 10), cheaper models for the high-volume steps, and a $5 budget alert. A budget alerts and does not stop spending. See [costs.md](costs.md) for the per-service table.
 
-### Checking a job
-
-The API Lambda has three routes for this: `POST /api/jobs/check` reads pasted text or a link (a link is fetched with a 10 second limit, never for private or LinkedIn addresses) and saves a New job; `GET /api/jobs/check/models` lists the connected AIs, scoring model first; `POST /api/jobs/{id}/fit` judges a saved job with the chosen one. Reading uses the extraction step and judging the scoring code a run uses. Neither call has tools, so pasted text cannot make the app do anything. The job is saved before judging, and a failed judgment changes nothing. One duplicate finder serves this and Add a job. Guide: [check-a-job.md](check-a-job.md).
-
 ## 11. Deploying and operating it
 
 ```
@@ -248,8 +258,9 @@ uv run python scripts/create_owner.py --email ...
 ## 12. Honest weak spots and what is not built
 
 - **Not built yet:** SES digest and reminder emails (outgoing mail is still only sign-in mail), the tool-using tailoring agent, the read-only external API, Bedrock as a model provider.
-- **Proven on a real account:** sign-in, the database layer, importing data, a schedule firing on its own, an AI web-search run, a custom hostname, and an emailed report from receipt to scored role with written documents. **Not yet observed:** a long unattended stretch of daily emailed reports.
+- **Proven on a real account:** sign-in, the database layer, importing data, a schedule firing on its own, an AI web-search run, a custom hostname, an emailed report from receipt to scored role with written documents, and Check a job (deployed, and confirmed working by the owner; which paths were tried was not recorded). **Not yet observed:** a long unattended stretch of daily emailed reports.
 - **Web-search runs are expensive** (see section 10), and the spending limit is checked between AI calls, so one call can overshoot it. The emailed-report path avoids this by doing no AI search at all.
+- **Check a job must answer inside the API function's 30 seconds.** It stops itself at 24 and says so, but the provider may still bill for a call that was given up on, and a database conflict replays the whole request, including its AI calls.
 - **Inbound email rows are not pruned.** Raw mail expires after 30 days, but the small record of each email stays.
 - **The ingest function connects as the database's admin role**, like every other function.
 - **Every function uses the database's admin role.** The app creates and updates its own tables. A narrower role is planned for the external API.
