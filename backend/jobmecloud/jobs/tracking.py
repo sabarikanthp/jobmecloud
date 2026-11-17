@@ -12,27 +12,28 @@ from sqlmodel import Session
 from jobmecloud.db.models import ActivityLog, Job
 
 OPEN = ("New", "Ready", "Applied", "Interviewing", "Offer")
-USER_STATUSES = ("Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped")
+USER_STATUSES = ("Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable")
 SKIP_REASON_COPY = "Choose why you're skipping this job."
 FUTURE_DATE_COPY = "That date is in the future."
 NOT_ALLOWED_COPY = "That change isn't available for a job that is {status}."
 
 # What the user can do next, in order of preference. "Reopen" is an action, not a status.
 _USER_NEXT = {
-    "New": ["Applied", "Skipped", "Rejected", "Withdrawn"],
-    "Ready": ["Applied", "Skipped", "Rejected", "Withdrawn"],
+    "New": ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable"],
+    "Ready": ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable"],
     "Closed": ["Applied", "Reopen"],
-    "Applied": ["Interviewing", "Offer", "Rejected", "Withdrawn"],
-    "Interviewing": ["Offer", "Rejected", "Withdrawn"],
+    "Applied": ["Interviewing", "Offer", "Rejected", "Withdrawn", "Unavailable"],
+    "Interviewing": ["Offer", "Rejected", "Withdrawn", "Unavailable"],
     "Offer": ["Accepted", "Rejected", "Withdrawn"],
     "Skipped": ["Reopen"],
     "Withdrawn": ["Reopen"],
+    "Unavailable": ["Reopen"],  # set by hand when the job is gone or can't be pursued
 }
 # What the system may do: target status -> statuses it may come from.
 _SYSTEM_FROM = {"New": (), "Ready": ("New",), "Closed": ("New", "Ready")}
 
 _RESPONSE = ("Interviewing", "Offer", "Accepted", "Rejected")
-_OUTCOME = ("Accepted", "Rejected", "Withdrawn", "Skipped")
+_OUTCOME = ("Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable")
 
 
 class TrackingError(Exception):
@@ -123,7 +124,7 @@ def change_status(session: Session, job: Job, to: str, *, actor: Literal["user",
 
 
 def reopen(session: Session, job: Job, *, at: datetime, note: str | None = None) -> None:
-    if job.status not in ("Skipped", "Withdrawn", "Closed"):
+    if job.status not in ("Skipped", "Withdrawn", "Closed", "Unavailable"):
         raise TrackingError(NOT_ALLOWED_COPY.format(status=job.status))
     old = job.status
     job.status = "Ready" if job.docs_folder else "New"

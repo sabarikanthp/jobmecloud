@@ -152,7 +152,7 @@ def test_detail_from_real_actions(client, five):
     client.post(f"/api/jobs/{jid}/interviews", json={"date": "2026-12-02", "stage": "Phone"})
     d = client.get(f"/api/jobs/{jid}").json()
     assert d["status"] == "Interviewing"
-    assert d["allowed_next"] == ["Offer", "Rejected", "Withdrawn"]
+    assert d["allowed_next"] == ["Offer", "Rejected", "Withdrawn", "Unavailable"]
     assert d["description"] == "Build data pipelines." and d["flags"] == ["Relocation"]
     assert [x["id"] for x in d["contacts"]] == [c["id"]]
     assert d["contacts"][0]["name"] == "Jordan Example"

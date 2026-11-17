@@ -80,7 +80,7 @@ def test_reopen(session):
 
 
 def test_allowed_next():
-    assert allowed_next(job("Applied")) == ["Interviewing", "Offer", "Rejected", "Withdrawn"]
+    assert allowed_next(job("Applied")) == ["Interviewing", "Offer", "Rejected", "Withdrawn", "Unavailable"]
     assert allowed_next(job("Closed")) == ["Applied", "Reopen"] and allowed_next(job("Accepted")) == []
 
 
@@ -100,3 +100,25 @@ def test_change_status_does_not_commit(session):
     change_status(session, j, "Applied", actor="user", at=NOW, on=date(2026, 11, 10))
     session.rollback()
     assert session.exec(select(ActivityLog)).all() == []
+
+
+@pytest.mark.parametrize("start", ["New", "Ready", "Applied", "Interviewing"])
+def test_a_job_can_be_marked_unavailable_by_hand_and_reopened(session, start):
+    j = job(start); session.add(j); session.commit()
+    assert "Unavailable" in allowed_next(j)
+    change_status(session, j, "Unavailable", actor="user", at=NOW, on=date(2026, 11, 10), note="Posting taken down")
+    assert (j.status, j.outcome_at) == ("Unavailable", datetime(2026, 11, 10, tzinfo=timezone.utc))
+    assert allowed_next(j) == ["Reopen"]
+    reopen(session, j, at=NOW)
+    assert j.status == "New" and j.outcome_at is None
+
+
+def test_unavailable_is_not_offered_once_the_job_has_an_outcome(session):
+    for status in ("Offer", "Accepted", "Rejected", "Skipped", "Withdrawn", "Closed"):
+        assert "Unavailable" not in allowed_next(job(status))
+
+
+def test_the_app_never_marks_a_job_unavailable_on_its_own(session):
+    j = job(); session.add(j); session.commit()
+    change_status(session, j, "Unavailable", actor="system", at=NOW)
+    assert j.status == "New"
