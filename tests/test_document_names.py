@@ -20,7 +20,7 @@ def test_document_names_follow_the_pattern(person, employer, title, kind, suffix
 
 def test_a_missing_name_title_or_employer_never_leaves_a_gap_or_an_unsafe_name():
     assert document_filename("", "CVS Health", "Lead Director", "resume", ".docx") == "CVS_LeadDirector.docx"
-    assert document_filename("Sabari P", "", "", "resume", ".docx") == "Sabari_P.docx"
+    assert document_filename("Jordan E", "", "", "resume", ".docx") == "Jordan_E.docx"
     assert document_filename("", "", "", "resume", ".docx") == "Resume.docx"
     assert document_filename("", "", "", "cover_letter", ".docx") == "Cover_Letter.docx"
     unsafe = document_filename('A/B"C', "../Evil:Corp", "X\\Y*?", "resume", ".docx")

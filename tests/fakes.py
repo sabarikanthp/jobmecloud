@@ -139,6 +139,7 @@ def draft_json_for_fixture() -> str:
             "sign_off": "Sincerely,",
         },
         "changes": ["Put the cost bullet first."],
+        "not_applied": [],
     })
 
 

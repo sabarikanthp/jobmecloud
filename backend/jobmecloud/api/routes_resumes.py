@@ -19,6 +19,7 @@ from jobmecloud.resumes.mapping import (
     ResumeMapping,
     clean_mapping,
     draft_mapping,
+    realign_mapping,
     remap_mapping,
     role_keys,
 )
@@ -109,7 +110,7 @@ async def draft(file: UploadFile, request: Request) -> dict:
     mapping, map_error = None, None
     if kind == "docx":
         try:
-            drafted = await run_in_threadpool(draft_mapping, provider, model, data, reading)
+            drafted = realign_mapping(await run_in_threadpool(draft_mapping, provider, model, data, reading), reading)
             if drafted.mapped():
                 mapping = drafted
             else:

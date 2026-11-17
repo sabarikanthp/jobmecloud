@@ -174,9 +174,14 @@ def load_mapping(data_dir: Path, resume_id: str) -> "ResumeMapping | None":
     path = _mapping_path(data_dir, resume_id)
     if not path.exists():
         return None
-    from jobmecloud.resumes.mapping import ResumeMapping
+    from jobmecloud.resumes.mapping import ResumeMapping, realign_mapping
 
-    return ResumeMapping.model_validate_json(path.read_text(encoding="utf-8"))
+    mapping = ResumeMapping.model_validate_json(path.read_text(encoding="utf-8"))
+    try:
+        reading = MasterResume.model_validate_json(_reading_path(data_dir, resume_id).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return mapping
+    return realign_mapping(mapping, reading)  # repairs labels the AI drew wrongly, so old saved mappings work too
 
 
 def save_mapping(data_dir: Path, resume_id: str, mapping: "ResumeMapping") -> None:

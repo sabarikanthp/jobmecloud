@@ -220,4 +220,4 @@ def code_check(
         skills=_check_skills(draft.content.skills, resume, notes),
     )
     letter = _check_letter(draft.letter, resume, terms, notes)
-    return Draft(content=content, letter=letter, changes=list(draft.changes)), notes
+    return Draft(content=content, letter=letter, changes=list(draft.changes), not_applied=list(draft.not_applied)), notes

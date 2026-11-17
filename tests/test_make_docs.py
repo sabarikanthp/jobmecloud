@@ -404,3 +404,122 @@ def test_a_resume_that_is_no_longer_in_the_library_is_a_setup_error_and_writes_n
     assert "no longer" in str(info.value).lower()
     with Session(engine) as s:
         assert s.get(Job, job_id).docs_folder is None
+
+
+# ---------------------------------------------------------------- feedback that the documents must honour
+
+
+def _paragraphs(path):
+    import docx
+    return [(p.style.name, p.text) for p in docx.Document(str(path)).paragraphs]
+
+
+def _draft_with(**extra):
+    base = json.loads(draft_json_for_fixture())
+    base.update(extra)
+    return json.dumps(base)
+
+
+def test_links_given_in_the_feedback_are_added_to_the_contact_line(data_dir, engine):
+    ready_profile(data_dir)
+    p = FakeProvider(replies=[draft_json_for_fixture(), '{"problems": []}'])
+    r = run(data_dir, engine, add_job(engine), p,
+            feedback="Please add my GitHub https://github.com/jordanx?tab=repositories to the header.")
+    contact = next(t for _, t in _paragraphs(r.folder / "resume.docx") if "jordan@example.com" in t)
+    assert "jordan@example.com" in contact and "github.com/jordanx" in contact and "tab=" not in contact
+    assert "github.com/jordanx" in r.note
+
+
+def test_a_link_already_on_the_contact_line_is_not_added_twice(data_dir, engine):
+    ready_profile(data_dir)
+    fb = "add https://github.com/jordanx and https://github.com/jordanx/"
+    r = run(data_dir, engine, add_job(engine), FakeProvider(replies=[draft_json_for_fixture(), '{"problems": []}']),
+            feedback=fb)
+    contact = next(t for _, t in _paragraphs(r.folder / "resume.docx") if "jordan@example.com" in t)
+    assert contact.count("github.com/jordanx") == 1
+
+
+def test_something_the_ai_could_not_do_is_reported_instead_of_dropped(data_dir, engine):
+    ready_profile(data_dir)
+    p = FakeProvider(replies=[_draft_with(not_applied=["Make the summary bold: formatting comes from your Word file."]),
+                              '{"problems": []}'])
+    r = run(data_dir, engine, add_job(engine), p, feedback="make the summary bold")
+    assert "couldn't apply" in r.note.lower() and "summary bold" in r.note
+    assert "summary bold" in (r.folder / "notes.md").read_text(encoding="utf-8")
+
+
+def test_the_ai_is_told_what_it_can_and_cannot_change(data_dir, engine):
+    ready_profile(data_dir)
+    p = FakeProvider(replies=[draft_json_for_fixture(), '{"problems": []}'])
+    run(data_dir, engine, add_job(engine), p, feedback="lean into healthcare")
+    prompt = p.calls[0]["messages"][0]["content"]
+    assert "not_applied" in prompt and "lean into healthcare" in prompt
+    assert "formatting" in prompt.lower()
+
+
+def test_the_feedback_is_kept_when_the_draft_has_to_be_revised(data_dir, engine):
+    ready_profile(data_dir)
+    p = FakeProvider(replies=[draft_json_for_fixture(), '{"problems": ["A claim is not in the resume."]}',
+                              draft_json_for_fixture()])
+    run(data_dir, engine, add_job(engine), p, feedback="lean into healthcare")
+    revise_prompt = p.calls[2]["messages"][0]["content"]
+    assert "lean into healthcare" in revise_prompt
+
+
+def _role_docx(reading_bullets):
+    import io
+
+    import docx
+    d = docx.Document()
+    d.add_paragraph("Jordan Example", style="Title")
+    d.add_paragraph("jordan@example.com · Springfield")
+    d.add_paragraph("Professional Summary", style="Heading 1")
+    d.add_paragraph("Data engineer with seven years of experience building reliable pipelines.")
+    d.add_paragraph("Professional Experience", style="Heading 1")
+    d.add_paragraph("Senior Engineer")
+    d.add_paragraph("Northwind Labs | Remote | January 2021 – October 2025")
+    for b in reading_bullets:
+        d.add_paragraph(b, style="List Bullet")
+    buf = io.BytesIO()
+    d.save(buf)
+    return buf.getvalue()
+
+
+def test_a_mapping_that_took_the_dates_line_for_a_bullet_no_longer_costs_the_dates_or_the_summary_style(data_dir, engine):
+    from jobmecloud.config.profile import MasterResume, ResumeRole
+    from jobmecloud.resumes.mapping import MappedParagraph, ResumeMapping
+    setup_profile(data_dir)
+    bullets = ["Built pipelines that moved 2 TB of data daily with Airflow.",
+               "Cut warehouse spend by 30 percent through better partitioning.",
+               "Moved reporting to a new warehouse without downtime."]
+    summary = "Data engineer with seven years of experience building reliable pipelines."
+    reading = MasterResume(summary=summary, roles=[ResumeRole(
+        employer="Northwind Labs", title="Senior Engineer", start="January 2021", end="October 2025", bullets=bullets)],
+        skills=[])
+    texts = ["Jordan Example", "jordan@example.com · Springfield", "Professional Summary", summary,
+             "Professional Experience", "Senior Engineer", "Northwind Labs | Remote | January 2021 – October 2025", *bullets]
+    labels = ["keep", "contact", "summary", "summary", "keep", "keep", "bullet:0:0", "bullet:0:1", "bullet:0:2", "keep"]
+    broken = ResumeMapping(paragraphs=[MappedParagraph(index=i, text=t, label=lab)
+                                       for i, (t, lab) in enumerate(zip(texts, labels))])
+    add_resume(data_dir, name="Main", filename="cv.docx", data=_role_docx(bullets), reading=reading, mapping=broken,
+               make_default=True, now=NOW)
+    save_user_for_test(data_dir)
+    tailored = {"content": {"headline": "", "summary": "A fresh summary written in sentence case.",
+                            "roles": [{"role": 0, "bullets": [{"source": 1, "text": bullets[1]}, {"source": 0, "text": bullets[0]},
+                                                              {"source": 2, "text": bullets[2]}]}], "skills": []},
+                "letter": {"greeting": "Dear Hiring Manager,", "paragraphs": ["Hello."], "sign_off": "Sincerely,"},
+                "changes": [], "not_applied": []}
+    p = FakeProvider(replies=[json.dumps(tailored), '{"problems": []}'])
+    r = run(data_dir, engine, add_job(engine), p)
+    paras = _paragraphs(r.folder / "resume.docx")
+    texts_out = [t for _, t in paras]
+    assert "Northwind Labs | Remote | January 2021 – October 2025" in texts_out  # the dates survive
+    summary_style = next(s for s, t in paras if t.startswith("A fresh summary"))
+    assert not summary_style.startswith("Heading")  # and the summary is not in a heading
+    assert "Professional Summary" in texts_out
+    assert sum(t == bullets[2] for t in texts_out) == 1  # nothing is left over from the original to repeat
+
+
+def save_user_for_test(data_dir):
+    from jobmecloud.config.profile import UserProfile, save_user
+    save_user(data_dir, UserProfile(name="Jordan Example", email="jordan@example.com"))
