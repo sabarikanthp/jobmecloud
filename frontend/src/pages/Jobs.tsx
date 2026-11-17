@@ -33,6 +33,7 @@ const STATUSES = [
   'Rejected',
   'Withdrawn',
   'Closed',
+  'Unavailable',
 ]
 const PAGE_SIZE = 50
 const STORAGE_KEY = 'jobmecloud.jobs.filters'

@@ -50,6 +50,13 @@ afterEach(async () => {
 })
 
 describe('RowStatus', () => {
+  it('offers Unavailable and makes the move as soon as it is chosen', async () => {
+    await mount({ id: 7, status: 'New', allowed_next: ['Applied', 'Unavailable'] })
+    expect(optionTexts(status()!)).toContain('Unavailable')
+    await choose(status()!, 'Unavailable')
+    expect(setStatus).toHaveBeenCalledWith(7, expect.objectContaining({ status: 'Unavailable', date: todayISO() }))
+  })
+
   it('shows the current status and offers only the moves that are allowed', async () => {
     await mount()
     expect(container.textContent).toContain('New')

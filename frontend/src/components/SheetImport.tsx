@@ -28,6 +28,7 @@ const STATUSES = [
   'Rejected',
   'Withdrawn',
   'Closed',
+  'Unavailable',
 ]
 const TYPES: { value: JobFieldType; label: string }[] = [
   { value: 'text', label: 'Text' },
