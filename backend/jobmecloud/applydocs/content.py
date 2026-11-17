@@ -32,6 +32,7 @@ class Draft(BaseModel):
     content: TailoredContent
     letter: CoverLetter
     changes: list[str]  # what changed and why, one line each
+    not_applied: list[str] = []  # things the user asked for that could not be done, one line each
 
 
 def _str() -> dict:
@@ -71,6 +72,7 @@ DRAFT_SCHEMA = _obj({
         "sign_off": _str(),
     }),
     "changes": _list(_str()),
+    "not_applied": _list(_str()),
 })
 
 

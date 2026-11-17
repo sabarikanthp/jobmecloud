@@ -15,6 +15,7 @@ from sqlmodel import Session
 
 from jobmecloud.applydocs.check import code_check
 from jobmecloud.applydocs.content import Draft, original_content
+from jobmecloud.applydocs.links import contact_index, feedback_links, new_links
 from jobmecloud.applydocs.output import (
     COVER_NAME,
     archive_previous,
@@ -111,13 +112,15 @@ def make_docs(
     inputs = _load_inputs(data_dir, engine, job_id, resume_id)
     draft, problems = _draft(provider, model, inputs, costs, feedback)
     draft, check_notes = code_check(draft, inputs.resume, inputs.profile, inputs.headline)
-    rendered = _render(inputs, draft, counter, today)
+    links = _links_to_add(inputs, feedback)
+    rendered = _render(inputs, draft, counter, today, links)
+    rendered.note = _say_what_happened(rendered.note, links, draft.not_applied)
 
     folder, _ = _open_folder(data_dir, inputs.settings, inputs.job, today, now)
     (folder / "resume.docx").write_bytes(rendered.resume)
     (folder / COVER_NAME).write_bytes(rendered.letter)
     write_job_md(folder, inputs.job)
-    write_notes_md(folder, inputs.job, changes=[*draft.changes, *problems], check_notes=check_notes,
+    write_notes_md(folder, inputs.job, changes=[*draft.changes, *[f"Not applied: {n}" for n in draft.not_applied], *problems], check_notes=check_notes,
                    page_note=rendered.note, resume_name=inputs.entry.name, as_is=False)
     _mark_done(engine, job_id, folder, rendered.note, now)
     return DocsResult(folder, rendered.note)
@@ -199,30 +202,52 @@ def _draft(provider: Provider, model: str, inputs: _Inputs, costs: CostTracker,
     problems = self_check(provider, model, draft=draft, resume=inputs.resume, profile=inputs.profile, costs=costs,
                          headline=inputs.headline)
     if problems:
-        draft = revise(provider, model, draft=draft, problems=problems, **common)
+        draft = revise(provider, model, draft=draft, problems=problems, feedback=feedback, **common)
     return draft, problems
 
 
 # ---------------------------------------------------------------- 3. render
 
 
-def _render(inputs: _Inputs, draft: Draft, counter: PageCounter, today: date) -> _Rendered:
+def _render(inputs: _Inputs, draft: Draft, counter: PageCounter, today: date, links: list[str]) -> _Rendered:
     original = original_content(inputs.resume, inputs.headline)
     if inputs.template is None or inputs.mapping is None:
-        fit = fit_pages(lambda c: render_plain_resume(inputs.resume, c, inputs.user),
+        user = inputs.user.model_copy(update={"links": [*inputs.user.links, *new_links(" ".join(inputs.user.links), links)]})
+        fit = fit_pages(lambda c: render_plain_resume(inputs.resume, c, user),
                         draft.content, original, None, counter)
-        letter = render_plain_cover_letter(draft.letter, inputs.user, today)
+        letter = render_plain_cover_letter(draft.letter, user, today)
         layout = NO_MAPPING_NOTE if inputs.entry.kind == "docx" else PLAIN_LAYOUT_NOTE
         return _Rendered(fit.docx, letter, f"{layout} {fit.note}")
 
     template, mapping = inputs.template, inputs.mapping
     try:
-        fit = fit_pages(lambda c: render_resume(template, mapping, c),
+        fit = fit_pages(lambda c: render_resume(template, mapping, c, links),
                         draft.content, original, original_page_count(template), counter)
-        letter = render_cover_letter(template, mapping, draft.letter, inputs.user, today)
+        letter = render_cover_letter(template, mapping, draft.letter, inputs.user, today, links)
     except ValueError as e:
         raise DocsSetupError(STALE_MAPPING_COPY) from e
     return _Rendered(fit.docx, letter, fit.note)
+
+
+def _links_to_add(inputs: _Inputs, feedback: str | None) -> list[str]:
+    """The links the user typed that belong on the contact line and are not there yet."""
+    links = feedback_links(feedback)
+    if not links:
+        return []
+    if inputs.template is None or inputs.mapping is None:
+        return links  # a plain layout builds its own contact line, so every link can go in
+    paragraphs = [(p.text, p.label) for p in inputs.mapping.paragraphs]
+    at = contact_index(paragraphs)
+    return [] if at is None else new_links(paragraphs[at][0], links)
+
+
+def _say_what_happened(note: str, links: list[str], not_applied: list[str]) -> str:
+    parts = [note]
+    if links:
+        parts.append(f"Added to your contact line: {', '.join(links)}.")
+    if not_applied:
+        parts.append("Couldn't apply: " + "; ".join(n.rstrip(".") for n in not_applied) + ".")
+    return " ".join(p for p in parts if p)
 
 
 # ---------------------------------------------------------------- 4. folder and job

@@ -6,6 +6,7 @@ it so the user's own formatting is kept. Otherwise plain documents are built.
 
 import copy
 import io
+from collections.abc import Sequence
 from datetime import date
 
 import docx
@@ -13,6 +14,7 @@ from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph as DocxParagraph
 
 from jobmecloud.applydocs.content import CoverLetter, TailoredContent
+from jobmecloud.applydocs.links import contact_index, new_links
 from jobmecloud.config.profile import MasterResume, UserProfile
 from jobmecloud.resumes.docx_text import iter_paragraph_objects, remove_paragraph, set_paragraph_text
 from jobmecloud.resumes.mapping import ResumeMapping
@@ -66,13 +68,33 @@ def _fill_first(paras: list[DocxParagraph], text: str) -> None:
             _drop(extra)
 
 
-def render_resume(template: bytes, mapping: ResumeMapping, content: TailoredContent) -> bytes:
+def _add_links(labelled: list[tuple[DocxParagraph, str]], links: Sequence[str]) -> None:
+    """Append links that are not already there to the contact line, in the look of its last run."""
+    if not links:
+        return
+    at = contact_index([(p.text, label) for p, label in labelled])
+    if at is None:
+        return
+    p = labelled[at][0]
+    missing = new_links(p.text, links)
+    if not missing:
+        return
+    sep = " · " if "·" in p.text and "|" not in p.text else " | "
+    look = p.runs[-1]._r.rPr if p.runs else None
+    run = p.add_run(sep + sep.join(missing))
+    if look is not None:
+        run._r.insert(0, copy.deepcopy(look))
+
+
+def render_resume(template: bytes, mapping: ResumeMapping, content: TailoredContent,
+                  links: Sequence[str] = ()) -> bytes:
     doc = _open(template)
     headline: list[DocxParagraph] = []
     summary: list[DocxParagraph] = []
     skills: list[DocxParagraph] = []
     slots: dict[int, list[DocxParagraph]] = {}
-    for p, label in _labelled(doc, mapping):
+    labelled = _labelled(doc, mapping)
+    for p, label in labelled:
         if label == "headline":
             headline.append(p)
         elif label == "summary":
@@ -89,6 +111,7 @@ def render_resume(template: bytes, mapping: ResumeMapping, content: TailoredCont
     # them, so they all stay as written. An empty skills list also leaves the paragraph alone.
     if len(skills) == 1 and content.skills:
         set_paragraph_text(skills[0], ", ".join(content.skills))
+    _add_links(labelled, links)
     bullets = {r.role: r.bullets for r in content.roles}
     for role, role_slots in slots.items():
         tailored = bullets.get(role, [])
@@ -105,9 +128,10 @@ def _letter_lines(letter: CoverLetter, user: UserProfile, today: date) -> list[s
 
 
 def render_cover_letter(template: bytes, mapping: ResumeMapping, letter: CoverLetter, user: UserProfile,
-                        today: date) -> bytes:
+                        today: date, links: Sequence[str] = ()) -> bytes:
     doc = _open(template)
     labelled = _labelled(doc, mapping)
+    _add_links(labelled, links)
     contact = {p._p for p, label in labelled if label == "contact"}
     summary = next((p for p, label in labelled if label == "summary"), None)
     ppr = _summary_ppr(summary)
