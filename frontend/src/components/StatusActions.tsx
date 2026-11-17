@@ -10,6 +10,7 @@ export const LABELS: Record<string, string> = {
   Accepted: 'I accepted',
   Rejected: 'Rejected',
   Withdrawn: 'I withdrew',
+  Unavailable: 'Unavailable',
   Skipped: 'Skip',
   Reopen: 'Reopen',
 }

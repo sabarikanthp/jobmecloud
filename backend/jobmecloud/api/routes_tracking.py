@@ -21,7 +21,7 @@ BLANK_COPY = "Please enter the employer and the job title."
 LINK_COPY = "The link should start with https://"
 DUPLICATE_COPY = "That job is already in JobMe."
 
-Status = Literal["Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped"]
+Status = Literal["Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable"]
 
 
 class StatusIn(BaseModel):

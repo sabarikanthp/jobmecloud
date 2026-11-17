@@ -6,6 +6,7 @@ const ROLE: Record<string, string> = {
   Skipped: 'grey',
   Withdrawn: 'grey',
   Closed: 'grey',
+  Unavailable: 'grey',
   Rejected: 'red',
 }
 

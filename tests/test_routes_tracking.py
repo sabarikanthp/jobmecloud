@@ -33,7 +33,7 @@ def test_mark_applied_creates_check_in(c, engine):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "Applied" and body["applied_date"] == "2026-11-10"
-    assert body["allowed_next"] == ["Interviewing", "Offer", "Rejected", "Withdrawn"]
+    assert body["allowed_next"] == ["Interviewing", "Offer", "Rejected", "Withdrawn", "Unavailable"]
     with Session(engine) as s:
         fus = list(s.exec(select(FollowUp)))
         assert len(fus) == 1 and fus[0].id == body["follow_up_id"]
