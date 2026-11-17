@@ -1,3 +1,4 @@
+import difflib
 import re
 
 from pydantic import BaseModel
@@ -159,3 +160,87 @@ def clean_mapping(mapping: ResumeMapping, reading: MasterResume) -> ResumeMappin
                 seen.add(f"{role_i}:{bullet_i}")
         cleaned.append(MappedParagraph(index=p.index, text=p.text, label=label))
     return ResumeMapping(paragraphs=cleaned, role_keys=mapping.role_keys, stale=mapping.stale)
+
+
+_CLOSE = 0.88  # how alike two pieces of text must be to count as the same bullet
+_WINDOW = 10   # how many reading bullets ahead to look, so a bullet missing from the file cannot derail the rest
+_MIN_TRUSTED = 0.6  # share of the reading's bullets that must be found in the file before the labels are redrawn
+
+
+def _norm(text: str) -> str:
+    return " ".join(re.sub(r"^[•●–\-*\s]+", "", text or "").lower().split())
+
+
+def _alike(a: str, b: str) -> float:
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    if abs(len(a) - len(b)) > 0.3 * max(len(a), len(b)):
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+
+
+def realign_mapping(mapping: ResumeMapping, reading: MasterResume) -> ResumeMapping:
+    """Make the bullet and summary labels agree with what the resume actually says.
+
+    The labels are first drawn by an AI, which sometimes counts a job's employer-and-dates line as its
+    first bullet (so tailoring overwrites it and the dates vanish) or calls a section heading the summary
+    (so the summary lands in the heading's bold capitals). The reading holds the real text of every bullet
+    and the summary, so the labels are checked against it and redrawn where they disagree. A mapping that
+    already agrees is returned unchanged, and one that cannot be matched to the reading is left alone.
+    """
+    if mapping.stale or not mapping.mapped():  # a mapping with nothing labelled is a choice, not a mistake
+        return mapping
+    if not keys_match(mapping, reading):  # the jobs changed since the labels were made: remap_mapping handles that
+        return mapping
+    paragraphs = [p.model_copy() for p in mapping.paragraphs]
+
+    # One summary: the paragraph that says the reading's summary, else the longest one.
+    summary_at = [n for n, p in enumerate(paragraphs) if p.label == "summary"]
+    if len(summary_at) > 1:
+        want = _norm(reading.summary)
+        best = max(summary_at, key=lambda n: (_alike(_norm(paragraphs[n].text), want), len(paragraphs[n].text)))
+        for n in summary_at:
+            if n != best:
+                paragraphs[n].label = "keep"
+
+    # Each job's bullets are matched in order, but the jobs can be in any order (the reading may have been reordered).
+    wanted = [[_norm(b) for b in r.bullets] for r in reading.roles]
+    total = sum(len(w) for w in wanted)
+    if total:
+        labels: list[str] = []
+        pos = [0] * len(wanted)
+        counts = [0] * len(wanted)
+        found = 0
+        for p in paragraphs:
+            text, label = _norm(p.text), p.label
+            best: tuple[float, int, int] | None = None
+            if len(text) >= 15:
+                for role, bullets in enumerate(wanted):
+                    for k in range(pos[role], min(pos[role] + _WINDOW, len(bullets))):
+                        score = _alike(text, bullets[k])
+                        if score >= _CLOSE and (best is None or score > best[0]):
+                            best = (score, role, k)
+                        if score >= _CLOSE:
+                            break
+            if best is not None:
+                _, role, k = best
+                label = f"bullet:{role}:{counts[role]}"
+                counts[role] += 1
+                pos[role] = k + 1
+                found += 1
+            elif label.startswith("bullet:"):
+                label = "keep"
+            labels.append(label)
+        if found / total >= _MIN_TRUSTED:
+            for p, label in zip(paragraphs, labels):
+                p.label = label
+        else:  # the file does not say what the reading says: do not guess
+            paragraphs = [
+                q.model_copy(update={"label": o.label}) if o.label.startswith("bullet:") else q
+                for q, o in zip(paragraphs, mapping.paragraphs)
+            ]
+    if [p.label for p in paragraphs] == [p.label for p in mapping.paragraphs]:
+        return mapping
+    return mapping.model_copy(update={"paragraphs": paragraphs})
