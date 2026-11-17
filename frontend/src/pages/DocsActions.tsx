@@ -38,6 +38,8 @@ export default function DocsActions({
   const [asking, setAsking] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [picked, setPicked] = useState('')
+  const [source, setSource] = useState('') // the resume to start from when regenerating; empty means the default
+  const [done, setDone] = useState('') // what just happened, in plain words
 
   const mine = busyId === job.id
   const locked = busyId !== null
@@ -45,6 +47,7 @@ export default function DocsActions({
   const fallback = resumes.find((r) => r.id === defaultId)?.id ?? resumes.find((r) => r.is_default)?.id ?? resumes[0]?.id ?? ''
   const chosen = resumes.some((r) => r.id === picked) ? picked : fallback
   const startLabel = hasDocs ? 'Regenerate' : 'Make docs'
+  const startFrom = resumes.some((r) => r.id === source) ? source : fallback
 
   async function open(what: 'resume' | 'cover_letter' | 'folder') {
     setError('')
@@ -57,24 +60,30 @@ export default function DocsActions({
 
   async function regenerate() {
     setError('')
+    setDone('')
     setWriting(true)
     setStale(false)
-    const out = await runDocs(job.id, () => makeDocs(job.id, feedback.trim() || null))
+    const updating = hasDocs // by the time the work finishes the page will say the files exist
+    const resumeId = startFrom && startFrom !== fallback ? startFrom : null
+    const out = await runDocs(job.id, () => makeDocs(job.id, feedback.trim() || null, resumeId))
     setWriting(false)
     setStale(out.stale)
     if (out.error) setError(out.error)
     else {
       setAsking(false)
       setFeedback('')
+      setDone(updating ? 'Resume and cover letter updated.' : 'New resume and cover letter created.')
     }
   }
 
   async function asIs() {
     setError('')
+    setDone('')
     setStale(false)
     const out = await runDocs(job.id, () => applyAsIs(job.id, chosen))
     setStale(out.stale)
     if (out.error) setError(out.error)
+    else setDone(`Now using ${resumes.find((r) => r.id === chosen)?.name ?? 'that resume'} as-is.`)
   }
 
   return (
@@ -123,6 +132,19 @@ export default function DocsActions({
       )}
       {makeable && asking && (
         <div className="field">
+          {resumes.length > 1 && (
+            <label>
+              Start from{' '}
+              <select aria-label="Start from" value={startFrom} disabled={mine} onChange={(e) => setSource(e.target.value)}>
+                {resumes.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                    {r.id === defaultId || r.is_default ? ' (default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="field-label">
             <label htmlFor={`feedback-${job.id}`}>What should change? (optional)</label>
           </div>
@@ -154,6 +176,7 @@ export default function DocsActions({
       {mine && writing && (
         <p className="help" role="status">Writing documents… this can take a minute.</p>
       )}
+      {done && !error && <p className="result ok" role="status">{done}</p>}
       {stale && !error && <p className="help">{STALE_NOTE}</p>}
       {shown && <div className="result bad">{shown}</div>}
     </>

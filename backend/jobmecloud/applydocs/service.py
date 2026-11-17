@@ -14,7 +14,8 @@ from jobmecloud.llm.steps import provider_for_step
 
 
 def generate_with_lock(
-    data_dir: Path, engine: Engine, deps: RunDeps, job_id: int, feedback: str | None, now: datetime
+    data_dir: Path, engine: Engine, deps: RunDeps, job_id: int, feedback: str | None, now: datetime,
+    resume_id: str | None = None,
 ) -> DocsResult:
     """Raises RunInProgressError, DocsSetupError, StepNotConfiguredError, FileInUseError or a provider error."""
     owner = acquire_run_lock(engine, now)
@@ -25,7 +26,7 @@ def generate_with_lock(
             costs = CostTracker(settings.prices, settings.caps.max_spend_per_run_usd)
             return make_docs(
                 data_dir, engine, job_id, provider=provider, model=model, costs=costs,
-                counter=deps.page_counter, now=now, feedback=feedback,
+                counter=deps.page_counter, now=now, feedback=feedback, resume_id=resume_id,
             )
     finally:
         release_run_lock(engine, owner)

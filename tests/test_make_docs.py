@@ -369,3 +369,38 @@ def test_as_is_logs_resume_name(data_dir, engine):
     with Session(engine) as s:
         row = s.exec(select(ActivityLog).where(ActivityLog.action == "docs_as_is")).one()
         assert (row.note, row.actor, row.job_id) == ("Short", "system", job_id)
+
+
+def _second_resume(data_dir):
+    other = FIXTURE_READING.model_copy(update={"summary": "A COMPLETELY DIFFERENT SUMMARY about platform migrations."})
+    return add_resume(data_dir, name="Platform version", filename="cv2.docx", data=make_resume_docx(), reading=other,
+                      mapping=fixture_mapping(), make_default=False, now=NOW)
+
+
+def test_docs_can_start_from_a_chosen_resume_instead_of_the_default(data_dir, engine):
+    ready_profile(data_dir)
+    chosen = _second_resume(data_dir)
+    job_id = add_job(engine)
+    p = FakeProvider(replies=[draft_json_for_fixture(), '{"problems": []}'])
+    r = run(data_dir, engine, job_id, p, resume_id=chosen.id)
+    assert "COMPLETELY DIFFERENT SUMMARY" in p.calls[0]["messages"][0]["content"]
+    assert "Platform version" in (r.folder / "notes.md").read_text(encoding="utf-8")
+    assert default_entry(data_dir).name == "Main"  # choosing a source does not change the default
+
+
+def test_without_a_choice_the_default_resume_is_still_used(data_dir, engine):
+    ready_profile(data_dir)
+    _second_resume(data_dir)
+    p = FakeProvider(replies=[draft_json_for_fixture(), '{"problems": []}'])
+    run(data_dir, engine, add_job(engine), p)
+    assert "COMPLETELY DIFFERENT SUMMARY" not in p.calls[0]["messages"][0]["content"]
+
+
+def test_a_resume_that_is_no_longer_in_the_library_is_a_setup_error_and_writes_nothing(data_dir, engine):
+    ready_profile(data_dir)
+    job_id = add_job(engine)
+    with pytest.raises(DocsSetupError) as info:
+        run(data_dir, engine, job_id, FakeProvider(replies=[draft_json_for_fixture()]), resume_id="gone")
+    assert "no longer" in str(info.value).lower()
+    with Session(engine) as s:
+        assert s.get(Job, job_id).docs_folder is None

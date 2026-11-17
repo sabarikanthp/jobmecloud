@@ -12,9 +12,11 @@ from pydantic import BaseModel
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
 
-from jobmecloud.applydocs.make_docs import DocsSetupError, use_as_is
-from jobmecloud.applydocs.output import COVER_NAME, RESUME_NAMES, FileInUseError
+from jobmecloud.applydocs.make_docs import NO_SUCH_RESUME_COPY, DocsSetupError, use_as_is
+from jobmecloud.applydocs.output import COVER_NAME, RESUME_NAMES, FileInUseError, document_filename
+from jobmecloud.resumes.store import load_index
 from jobmecloud.applydocs.service import generate_with_lock
+from jobmecloud.config.profile import load_user
 from jobmecloud.config.settings import load_settings
 from jobmecloud.db.models import Job
 from jobmecloud.jobs.runlock import (
@@ -39,6 +41,7 @@ DOCS_TIMED_OUT_COPY = "Writing the documents timed out. Please try again."
 
 class DocsIn(BaseModel):
     feedback: str | None = None
+    resume_id: str | None = None  # start from this resume in the library instead of the default
 
 
 class AsIsIn(BaseModel):
@@ -71,11 +74,11 @@ def _save_error(engine: Engine, job_id: int, text: str) -> None:
             session.commit()
 
 
-def _make(state, job_id: int, feedback: str | None) -> dict:
+def _make(state, job_id: int, feedback: str | None, resume_id: str | None = None) -> dict:
     """Write the documents inside this request (tests and local use)."""
     try:
         result = generate_with_lock(
-            state.data_dir, state.engine, state.run_deps, job_id, feedback, datetime.now(timezone.utc)
+            state.data_dir, state.engine, state.run_deps, job_id, feedback, datetime.now(timezone.utc), resume_id
         )
         return {"note": result.note, "folder": str(result.folder)}
     except RunInProgressError:
@@ -90,7 +93,7 @@ def _make(state, job_id: int, feedback: str | None) -> dict:
         raise HTTPException(502, text) from None
 
 
-def _start_docs(state, job_id: int, feedback: str | None) -> JSONResponse:
+def _start_docs(state, job_id: int, feedback: str | None, resume_id: str | None = None) -> JSONResponse:
     """Hand the writing to a docs worker; the page polls /docs/status until it finishes."""
     if run_lock_held(state.engine, datetime.now(timezone.utc)):
         raise HTTPException(409, IN_PROGRESS_COPY)
@@ -101,7 +104,8 @@ def _start_docs(state, job_id: int, feedback: str | None) -> JSONResponse:
         session.add(job)
         session.commit()
     try:
-        state.dispatcher.start_docs(job_id, {"feedback": feedback})
+        options = {"feedback": feedback, **({"resume_id": resume_id} if resume_id else {})}
+        state.dispatcher.start_docs(job_id, options)
     except Exception:
         text = "Writing the documents could not be started. Please try again."
         _save_error(state.engine, job_id, text)
@@ -125,9 +129,12 @@ async def make_job_docs(job_id: int, body: DocsIn, request: Request) -> dict:
     if feedback is not None and len(feedback) > MAX_FEEDBACK:
         raise HTTPException(400, FEEDBACK_COPY)
     _require_job(state.engine, job_id)
+    resume_id = (body.resume_id or "").strip() or None
+    if resume_id is not None and not any(e.id == resume_id for e in load_index(state.data_dir).resumes):
+        raise HTTPException(400, NO_SUCH_RESUME_COPY)
     if state.dispatcher.synchronous_docs:
-        return await run_in_threadpool(_make, state, job_id, feedback)
-    return await run_in_threadpool(_start_docs, state, job_id, feedback)
+        return await run_in_threadpool(_make, state, job_id, feedback, resume_id)
+    return await run_in_threadpool(_start_docs, state, job_id, feedback, resume_id)
 
 
 @router.get("/jobs/{job_id}/docs/status")
@@ -225,4 +232,8 @@ def download_job_file(job_id: int, body: DownloadIn, request: Request) -> dict:
         relative = target.resolve().relative_to(Path(state.data_dir).resolve())
     except ValueError:
         raise HTTPException(404, NO_DOCS_COPY) from None
-    return {"url": state.workspace.presign(relative.as_posix()), "filename": target.name}
+    with Session(state.engine) as session:
+        job = session.get(Job, job_id)
+        employer, title = (job.employer, job.title) if job else ("", "")
+    name = document_filename(load_user(state.data_dir).name, employer, title, body.what, target.suffix)
+    return {"url": state.workspace.presign(relative.as_posix(), download_name=name), "filename": name}
