@@ -184,6 +184,7 @@ export default function CheckJobPanel({
                 runDocs={runDocs}
                 makeable
                 hasDocs={current.docs_folder !== null}
+                onResumeAdded={() => listResumes().then(setResumes)}
               />
             )
           )}

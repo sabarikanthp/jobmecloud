@@ -130,7 +130,7 @@ async def make_job_docs(job_id: int, body: DocsIn, request: Request) -> dict:
         raise HTTPException(400, FEEDBACK_COPY)
     _require_job(state.engine, job_id)
     resume_id = (body.resume_id or "").strip() or None
-    if resume_id is not None and not any(e.id == resume_id for e in load_index(state.data_dir).resumes):
+    if resume_id not in (None, "auto") and not any(e.id == resume_id for e in load_index(state.data_dir).resumes):
         raise HTTPException(400, NO_SUCH_RESUME_COPY)
     if state.dispatcher.synchronous_docs:
         return await run_in_threadpool(_make, state, job_id, feedback, resume_id)

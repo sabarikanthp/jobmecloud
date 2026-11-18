@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { makeDocs, openDoc, useAsIs as applyAsIs, type ResumeEntry } from '../api.ts'
+import { useRef, useState, type ReactNode } from 'react'
+import { draftResume, makeDocs, openDoc, saveNewResume, useAsIs as applyAsIs, type ResumeEntry } from '../api.ts'
 import { authEnabled } from '../auth.ts'
 import { errorText } from './jobFormat.ts'
 import { STALE_NOTE, type DocsRunner } from './docsTypes.ts'
@@ -21,6 +21,7 @@ export default function DocsActions({
   runDocs,
   makeable,
   hasDocs = true,
+  onResumeAdded,
   children,
 }: {
   job: DocsJob
@@ -30,6 +31,7 @@ export default function DocsActions({
   runDocs: DocsRunner
   makeable: boolean
   hasDocs?: boolean
+  onResumeAdded?: () => void | Promise<void>
   children?: ReactNode
 }) {
   const [error, setError] = useState('')
@@ -38,7 +40,9 @@ export default function DocsActions({
   const [asking, setAsking] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [picked, setPicked] = useState('')
-  const [source, setSource] = useState('') // the resume to start from when regenerating; empty means the default
+  const [source, setSource] = useState('auto') // the resume to start from: "auto" lets JobMeCloud pick the closest
+  const [reading, setReading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [done, setDone] = useState('') // what just happened, in plain words
 
   const mine = busyId === job.id
@@ -47,7 +51,7 @@ export default function DocsActions({
   const fallback = resumes.find((r) => r.id === defaultId)?.id ?? resumes.find((r) => r.is_default)?.id ?? resumes[0]?.id ?? ''
   const chosen = resumes.some((r) => r.id === picked) ? picked : fallback
   const startLabel = hasDocs ? 'Regenerate' : 'Make docs'
-  const startFrom = resumes.some((r) => r.id === source) ? source : fallback
+  const startFrom = source === 'auto' || resumes.some((r) => r.id === source) ? source : 'auto'
 
   async function open(what: 'resume' | 'cover_letter' | 'folder') {
     setError('')
@@ -64,7 +68,7 @@ export default function DocsActions({
     setWriting(true)
     setStale(false)
     const updating = hasDocs // by the time the work finishes the page will say the files exist
-    const resumeId = startFrom && startFrom !== fallback ? startFrom : null
+    const resumeId = startFrom === 'auto' ? null : startFrom
     const out = await runDocs(job.id, () => makeDocs(job.id, feedback.trim() || null, resumeId))
     setWriting(false)
     setStale(out.stale)
@@ -73,6 +77,30 @@ export default function DocsActions({
       setAsking(false)
       setFeedback('')
       setDone(updating ? 'Resume and cover letter updated.' : 'New resume and cover letter created.')
+    }
+  }
+
+  async function uploadResume(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setError('')
+    setReading(true)
+    try {
+      const draft = await draftResume(file)
+      const entry = await saveNewResume({
+        upload_id: draft.upload_id,
+        name: draft.filename.replace(/\.[^.]*$/, ''),
+        reading: draft.reading,
+        mapping: draft.kind === 'docx' ? draft.mapping : null,
+        make_default: false,
+      })
+      await onResumeAdded?.()
+      setSource(entry.id)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setReading(false)
     }
   }
 
@@ -132,10 +160,11 @@ export default function DocsActions({
       )}
       {makeable && asking && (
         <div className="field">
-          {resumes.length > 1 && (
+          <div className="row">
             <label>
               Start from{' '}
-              <select aria-label="Start from" value={startFrom} disabled={mine} onChange={(e) => setSource(e.target.value)}>
+              <select aria-label="Start from" value={startFrom} disabled={mine || reading} onChange={(e) => setSource(e.target.value)}>
+                <option value="auto">Best match (automatic)</option>
                 {resumes.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
@@ -144,7 +173,12 @@ export default function DocsActions({
                 ))}
               </select>
             </label>
-          )}
+            <button type="button" disabled={mine || reading} onClick={() => fileRef.current?.click()}>
+              Upload a different resume…
+            </button>
+            <input ref={fileRef} type="file" accept=".docx,.pdf,.txt,.md" hidden onChange={(e) => void uploadResume(e)} />
+          </div>
+          {reading && <p className="muted" role="status">Reading the resume…</p>}
           <div className="field-label">
             <label htmlFor={`feedback-${job.id}`}>What should change? (optional)</label>
           </div>
