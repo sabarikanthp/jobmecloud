@@ -16,6 +16,7 @@ import {
 import { fmtInstant, localISO, todayISO } from '../dates.ts'
 import { inboundNoticeText, lastRunText, staleRunText } from './runLabels.ts'
 import FollowUpList from '../components/FollowUpList.tsx'
+import RepeatBanner from '../components/RepeatBanner.tsx'
 import StatusActions from '../components/StatusActions.tsx'
 import StatusBadge from '../components/StatusBadge.tsx'
 import Tip from '../components/Tip.tsx'
@@ -31,6 +32,8 @@ function outcomeLabel(row: RunJobRow): string {
       return 'New'
     case 'duplicate':
       return 'Seen before'
+    case 'repeat':
+      return 'Repeat of an earlier job'
     case 'excluded': {
       const rules = Array.isArray(row.job.hard_rules) ? row.job.hard_rules : []
       return `Excluded: ${rules
@@ -54,6 +57,7 @@ function outcomeReason(row: RunJobRow): string {
   const { job } = row
   if (row.outcome === 'closed') return 'The posting is no longer open.'
   if (row.outcome === 'duplicate') return 'JobMe already had this job from an earlier run.'
+  if (row.outcome === 'repeat') return 'The same job as one already in your tracker, so it was not scored. Reopen it if that is wrong.'
   if (job.reasons) return job.reasons
   if (job.match_score == null && job.flags.length > 0) return `Not scored: ${job.flags.join('; ')}.`
   return ''
@@ -186,7 +190,7 @@ export default function Today() {
     }
   }
 
-  const notEligible = ['excluded', 'closed', 'duplicate']
+  const notEligible = ['excluded', 'closed', 'duplicate', 'repeat']
   const ready = rows.filter((r) => r.job.docs_folder && !notEligible.includes(r.outcome))
   const noDocs = rows.filter((r) => !r.job.docs_folder && (r.outcome === 'matched' || r.outcome === 'prepared'))
   const matches = [...ready, ...noDocs]
@@ -306,6 +310,7 @@ export default function Today() {
                       <strong>Gaps:</strong> {job.gaps}
                     </p>
                   )}
+                  <RepeatBanner job={job} onChanged={changed} />
                   {canMakeDocs(job.status) && <MakeDocsButton job={job} busyId={busyId} runDocs={runDocs} />}
                   <StatusActions job={job} skipReasons={skipReasons} onChanged={changed} />
                 </div>
@@ -336,6 +341,7 @@ export default function Today() {
                         </td>
                         <td className="job-cell">
                           {job.employer} — {job.title} <StatusBadge status={job.status} /> <ApplyLink job={job} />
+                          <RepeatBanner job={job} onChanged={changed} />
                           {job.flags.length > 0 && (
                             <div className="flag-list">
                               <Chips flags={job.flags} />
@@ -385,6 +391,7 @@ export default function Today() {
                         <td>{[job.location, job.work_mode].filter(Boolean).join(' · ') || '—'}</td>
                         <td className="why-cell">
                           {job.flags.length > 0 ? <Chips flags={job.flags} /> : '—'}
+                          <RepeatBanner job={job} onChanged={changed} />
                         </td>
                         <td className="actions-cell">
                           {canMakeDocs(job.status) && <MakeDocsButton job={job} busyId={busyId} runDocs={runDocs} />}

@@ -81,7 +81,7 @@ def test_reopen(session):
 
 def test_allowed_next():
     assert allowed_next(job("Applied")) == ["Interviewing", "Offer", "Rejected", "Withdrawn", "Unavailable"]
-    assert allowed_next(job("Closed")) == ["Applied", "Reopen"] and allowed_next(job("Accepted")) == []
+    assert allowed_next(job("Closed")) == ["Applied", "Reopen", "Duplicate"] and allowed_next(job("Accepted")) == []
 
 
 def test_log_columns_are_nullable_in_the_database(session):

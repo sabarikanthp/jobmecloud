@@ -9,6 +9,7 @@ from jobmecloud.agents.jobscout.pipeline import RunSetupError, abandon_run, pref
 from jobmecloud.db.models import Job, Run, RunJob
 from jobmecloud.jobs.runlock import IN_PROGRESS_COPY, RunInProgressError, run_lock_held
 from jobmecloud.jobs.tracking import allowed_next
+from jobmecloud.jobs.views import related_job
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -56,6 +57,8 @@ class JobOut(BaseModel):
     docs_note: str | None
     docs_error: str | None
     allowed_next: list[str] = []
+    looks_like: dict | None = None    # an earlier job this one may repeat, and what was decided about it
+    duplicate_of: dict | None = None  # the job this one is a duplicate of
 
 
 class RunJobOut(BaseModel):
@@ -105,6 +108,11 @@ def latest_run(request: Request) -> RunOut | None:
         return _run_out(run, engine) if run else None
 
 
+def _earlier(session: Session, job: Job) -> dict:
+    other = related_job(session, job.repost_of_id)
+    return {"duplicate_of": other} if job.status == "Duplicate" else {"looks_like": other}
+
+
 @router.get("/runs/{run_id}/jobs")
 def run_jobs(run_id: int, request: Request) -> list[RunJobOut]:
     with Session(request.app.state.engine) as session:
@@ -119,6 +127,6 @@ def run_jobs(run_id: int, request: Request) -> list[RunJobOut]:
         return [
             RunJobOut(outcome=rj.outcome,
                       job=JobOut.model_validate(job, from_attributes=True)
-                      .model_copy(update={"allowed_next": allowed_next(job)}))
+                      .model_copy(update={"allowed_next": allowed_next(job), **_earlier(session, job)}))
             for rj, job in rows
         ]

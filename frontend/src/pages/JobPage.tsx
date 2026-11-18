@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getJob, getSettings, listResumes, type JobDetail, type ResumeList } from '../api.ts'
+import ReEvaluate from '../components/ReEvaluate.tsx'
+import RepeatBanner from '../components/RepeatBanner.tsx'
 import StatusActions from '../components/StatusActions.tsx'
 import StatusBadge from '../components/StatusBadge.tsx'
 import { useNav } from '../nav.tsx'
@@ -104,6 +106,7 @@ export default function JobPage({ id }: { id: number }) {
             <Chips flags={job.flags} />
           </p>
         )}
+        <RepeatBanner job={job} onChanged={reload} />
       </section>
 
       <section className="card" aria-labelledby="job-status">
@@ -119,6 +122,11 @@ export default function JobPage({ id }: { id: number }) {
       </section>
 
       <JobDetails job={job} onChanged={reload} />
+
+      <section className="card" aria-labelledby="job-fit">
+        <h2 id="job-fit">Fit</h2>
+        <ReEvaluate job={job} onChanged={reload} />
+      </section>
 
       <section className="card" aria-labelledby="job-docs">
         <h2 id="job-docs">Documents</h2>

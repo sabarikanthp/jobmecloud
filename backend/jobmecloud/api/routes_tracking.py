@@ -21,7 +21,7 @@ BLANK_COPY = "Please enter the employer and the job title."
 LINK_COPY = "The link should start with https://"
 DUPLICATE_COPY = "That job is already in JobMe."
 
-Status = Literal["Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable"]
+Status = Literal["Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable", "Duplicate"]
 
 
 class StatusIn(BaseModel):
@@ -30,6 +30,7 @@ class StatusIn(BaseModel):
     skip_reason: str | None = None
     skip_note: str | None = None
     note: str | None = None
+    duplicate_of: int | None = None  # the job this one repeats, when the status is Duplicate
 
 
 class ReopenIn(BaseModel):
@@ -99,7 +100,8 @@ def set_status(job_id: int, body: StatusIn, request: Request) -> TrackingOut:
         try:
             tracking.change_status(session, job, body.status, actor="user", at=at, on=body.date,
                                    skip_reason=body.skip_reason, skip_note=body.skip_note,
-                                   note=body.note, skip_reasons=settings.skip_reasons)
+                                   note=body.note, skip_reasons=settings.skip_reasons,
+                                   duplicate_of=body.duplicate_of)
             if body.status == "Applied":
                 fu = fu_rules.create_for_applied(
                     session, job, default_days=settings.followup_default_days,

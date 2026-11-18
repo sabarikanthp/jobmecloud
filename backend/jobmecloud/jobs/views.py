@@ -75,6 +75,20 @@ def job_row(session: Session, job: Job, today: date) -> dict:
     return _row(job, _next_due(session, [job.id]).get(job.id))
 
 
+def related_job(session: Session, job_id: int | None) -> dict | None:
+    """A short description of another job, with what was decided about it, for "duplicate of" and "looks like"."""
+    other = session.get(Job, job_id) if job_id is not None else None
+    if other is None:
+        return None
+    decided = None
+    if other.status == "Skipped":
+        decided = "Skipped" + (f": {other.skip_reason}" if other.skip_reason else "")
+    elif other.status not in ("New", "Ready"):
+        decided = other.status
+    return {"id": other.id, "employer": other.employer, "title": other.title, "status": other.status,
+            "decided": decided, "decided_date": iso(utc_date(other.outcome_at or other.applied_at))}
+
+
 def job_detail(session: Session, job: Job, today: date) -> dict:
     out = job_row(session, job, today)
     contacts = session.exec(select(Contact).where(Contact.job_id == job.id)
@@ -86,7 +100,12 @@ def job_detail(session: Session, job: Job, today: date) -> dict:
                               .order_by(Interview.date.is_(None), Interview.date, Interview.id)).all()
     timeline = session.exec(select(ActivityLog).where(ActivityLog.job_id == job.id)
                             .order_by(ActivityLog.at.desc(), ActivityLog.id.desc())).all()
+    earlier = related_job(session, job.repost_of_id)
+    also = session.exec(select(Job).where(Job.repost_of_id == job.id).order_by(Job.id)).all()
     out.update({
+        "duplicate_of": earlier if job.status == "Duplicate" else None,
+        "looks_like": earlier if job.status != "Duplicate" else None,
+        "also_seen_as": [{"id": j.id, "employer": j.employer, "title": j.title, "status": j.status} for j in also],
         "description": job.description, "reasons": job.reasons, "gaps": job.gaps,
         "hard_rules": job.hard_rules, "notes": job.notes, "skip_reason": job.skip_reason,
         "skip_note": job.skip_note, "liveness": job.liveness, "repost_of_id": job.repost_of_id,

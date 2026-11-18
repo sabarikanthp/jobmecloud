@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { reopenJob, setStatus } from '../api.ts'
 import { todayISO } from '../dates.ts'
 import { errorText } from '../pages/jobFormat.ts'
+import DuplicatePicker from './DuplicatePicker.tsx'
 import StatusBadge from './StatusBadge.tsx'
 import { LABELS, type StatusJob } from './StatusActions.tsx'
 
@@ -18,11 +19,12 @@ export default function RowStatus({
   onChanged: () => void | Promise<void>
 }) {
   const [asking, setAsking] = useState(false) // waiting for a reason to skip
+  const [picking, setPicking] = useState(false) // waiting for the job this one repeats
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const moves = job.allowed_next ?? [] // an older server may not send it: then there is simply no dropdown
 
-  async function apply(action: string, reason?: string) {
+  async function apply(action: string, reason?: string, duplicateOf?: number) {
     setBusy(true)
     setError('')
     try {
@@ -35,9 +37,11 @@ export default function RowStatus({
           note: null,
           skip_reason: action === 'Skipped' ? (reason ?? null) : null,
           skip_note: null,
+          ...(duplicateOf !== undefined ? { duplicate_of: duplicateOf } : {}),
         })
       }
       setAsking(false)
+      setPicking(false)
       await onChanged()
     } catch (e) {
       setError(errorText(e))
@@ -50,6 +54,7 @@ export default function RowStatus({
     if (!value) return
     setError('')
     if (value === 'Skipped') setAsking(true)
+    else if (value === 'Duplicate') setPicking(true)
     else void apply(value)
   }
 
@@ -57,7 +62,7 @@ export default function RowStatus({
     <div className="row-status">
       <StatusBadge status={job.status} />
       {moves.length > 0 && (
-        <select aria-label="Change status" value="" disabled={busy || asking} onChange={(e) => chosen(e.target.value)}>
+        <select aria-label="Change status" value="" disabled={busy || asking || picking} onChange={(e) => chosen(e.target.value)}>
           <option value="">Change…</option>
           {moves.map((a) => (
             <option key={a} value={a}>
@@ -87,6 +92,14 @@ export default function RowStatus({
             Cancel
           </button>
         </span>
+      )}
+      {picking && (
+        <DuplicatePicker
+          jobId={job.id}
+          busy={busy}
+          onPick={(id) => apply('Duplicate', undefined, id)}
+          onCancel={() => setPicking(false)}
+        />
       )}
       {error && <span className="row-error">{error}</span>}
     </div>

@@ -2,8 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { fmtDate, listFollowUps, reopenJob, setStatus } from '../api.ts'
 import { todayISO } from '../dates.ts'
 import { errorText } from '../pages/jobFormat.ts'
+import DuplicatePicker from './DuplicatePicker.tsx'
 
 export const LABELS: Record<string, string> = {
+  Duplicate: 'Duplicate…',
   Applied: 'Mark applied',
   Interviewing: 'Got an interview',
   Offer: 'Got an offer',
@@ -47,6 +49,27 @@ export default function StatusActions({
     setReason('')
     setError('')
     setInfo('')
+  }
+
+  async function markDuplicate(originalId: number) {
+    setBusy(true)
+    setError('')
+    try {
+      await setStatus(job.id, {
+        status: 'Duplicate',
+        duplicate_of: originalId,
+        date: null,
+        note: null,
+        skip_reason: null,
+        skip_note: null,
+      })
+      setAction(null)
+      await onChanged()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function submit(e: FormEvent) {
@@ -109,7 +132,10 @@ export default function StatusActions({
           ))}
         </div>
       )}
-      {action && (
+      {action === 'Duplicate' && (
+        <DuplicatePicker jobId={job.id} busy={busy} onPick={markDuplicate} onCancel={() => setAction(null)} />
+      )}
+      {action && action !== 'Duplicate' && (
         <form className="inline-form" onSubmit={(e) => void submit(e)}>
           {skipping && (
             <div className="field">
