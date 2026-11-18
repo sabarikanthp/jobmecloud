@@ -116,13 +116,13 @@ def make_docs(
     draft, check_notes = code_check(draft, inputs.resume, inputs.profile, inputs.headline)
     links = _links_to_add(inputs, feedback)
     rendered = _render(inputs, draft, counter, today, links)
-    rendered.note = _say_what_happened(rendered.note, links, draft.not_applied, chosen)
+    rendered.note = _say_what_happened(rendered.note, links, draft.not_applied, chosen, draft.impact)
 
     folder, _ = _open_folder(data_dir, inputs.settings, inputs.job, today, now)
     (folder / "resume.docx").write_bytes(rendered.resume)
     (folder / COVER_NAME).write_bytes(rendered.letter)
     write_job_md(folder, inputs.job)
-    write_notes_md(folder, inputs.job, changes=[*([chosen] if chosen else []), *draft.changes, *[f"Not applied: {n}" for n in draft.not_applied], *problems], check_notes=check_notes,
+    write_notes_md(folder, inputs.job, changes=[*([f"What changed and why it is stronger: {draft.impact}"] if draft.impact.strip() else []), *([chosen] if chosen else []), *draft.changes, *[f"Not applied: {n}" for n in draft.not_applied], *problems], check_notes=check_notes,
                    page_note=rendered.note, resume_name=inputs.entry.name, as_is=False)
     _mark_done(engine, job_id, folder, rendered.note, now)
     return DocsResult(folder, rendered.note)
@@ -266,8 +266,9 @@ def _links_to_add(inputs: _Inputs, feedback: str | None) -> list[str]:
     return [] if at is None else new_links(paragraphs[at][0], links)
 
 
-def _say_what_happened(note: str, links: list[str], not_applied: list[str], chosen: str | None = None) -> str:
-    parts = [note]
+def _say_what_happened(note: str, links: list[str], not_applied: list[str], chosen: str | None = None,
+                       impact: str = "") -> str:
+    parts = [impact.strip(), note]
     if chosen:
         parts.append(chosen)
     if links:

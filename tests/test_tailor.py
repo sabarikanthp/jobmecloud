@@ -14,7 +14,7 @@ def draft_json(**kw):
     base = {"content": {"headline": "", "summary": "Data engineer for healthcare.", "roles": [{"role": 0, "bullets": [{"source": 1, "text": "Led B"}]}],
                         "skills": ["SQL"]},
             "letter": {"greeting": "Dear Hiring Manager,", "paragraphs": ["P1", "P2"], "sign_off": "Sincerely,"},
-            "changes": ["Moved B first"], "not_applied": []}
+            "changes": ["Moved B first"], "not_applied": [], "impact": ""}
     return json.dumps({**base, **kw})
 
 

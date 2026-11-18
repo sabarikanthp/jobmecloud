@@ -508,7 +508,7 @@ def test_a_mapping_that_took_the_dates_line_for_a_bullet_no_longer_costs_the_dat
                             "roles": [{"role": 0, "bullets": [{"source": 1, "text": bullets[1]}, {"source": 0, "text": bullets[0]},
                                                               {"source": 2, "text": bullets[2]}]}], "skills": []},
                 "letter": {"greeting": "Dear Hiring Manager,", "paragraphs": ["Hello."], "sign_off": "Sincerely,"},
-                "changes": [], "not_applied": []}
+                "changes": [], "not_applied": [], "impact": ""}
     p = FakeProvider(replies=[json.dumps(tailored), '{"problems": []}'])
     r = run(data_dir, engine, add_job(engine), p)
     paras = _paragraphs(r.folder / "resume.docx")
@@ -523,3 +523,12 @@ def test_a_mapping_that_took_the_dates_line_for_a_bullet_no_longer_costs_the_dat
 def save_user_for_test(data_dir):
     from jobmecloud.config.profile import UserProfile, save_user
     save_user(data_dir, UserProfile(name="Jordan Example", email="jordan@example.com"))
+
+
+def test_a_short_note_on_what_changed_and_why_it_is_stronger_is_shown_and_kept(data_dir, engine):
+    ready_profile(data_dir)
+    note = "Led with the cost savings the posting stresses and cut two older bullets, so the resume reads as a cost-focused leader."
+    p = FakeProvider(replies=[_draft_with(impact=note), '{"problems": []}'])
+    r = run(data_dir, engine, add_job(engine), p)
+    assert r.note.startswith(note)
+    assert note in (r.folder / "notes.md").read_text(encoding="utf-8")

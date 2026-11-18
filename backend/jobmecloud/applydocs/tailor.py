@@ -94,7 +94,9 @@ def _task_text(profile: SearchProfile, resume: MasterResume, job: Job, user: Use
         "Return the tailored resume content: the headline, and for every bullet you keep, give role (the role index), "
         "source (the bullet index) and text. Bullets you leave out are dropped. "
         "Also return the cover letter and, in changes, one line per change saying what changed and why. "
-        "In not_applied, list one line for each thing the user asked for that you could not do (empty when none).",
+        "In not_applied, list one line for each thing the user asked for that you could not do (empty when none). "
+        "In impact, write two or three plain sentences to the person: what you changed in the resume and how that makes it "
+        "stronger for this job. Mention only changes you actually made.",
     ])
 
 

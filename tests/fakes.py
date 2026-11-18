@@ -140,6 +140,7 @@ def draft_json_for_fixture() -> str:
         },
         "changes": ["Put the cost bullet first."],
         "not_applied": [],
+        "impact": "",
     })
 
 
