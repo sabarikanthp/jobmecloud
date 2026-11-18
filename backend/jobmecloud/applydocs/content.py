@@ -33,6 +33,7 @@ class Draft(BaseModel):
     letter: CoverLetter
     changes: list[str]  # what changed and why, one line each
     not_applied: list[str] = []  # things the user asked for that could not be done, one line each
+    impact: str = ""  # two or three sentences: what changed and how that strengthens the resume for this job
 
 
 def _str() -> dict:
@@ -73,6 +74,7 @@ DRAFT_SCHEMA = _obj({
     }),
     "changes": _list(_str()),
     "not_applied": _list(_str()),
+    "impact": _str(),
 })
 
 
