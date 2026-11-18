@@ -138,6 +138,7 @@ export default function JobPage({ id }: { id: number }) {
           runDocs={runDocs}
           makeable
           hasDocs={job.docs_folder !== null}
+          onResumeAdded={() => listResumes().then(setResumes)}
         />
       </section>
 

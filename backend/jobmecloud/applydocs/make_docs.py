@@ -38,6 +38,7 @@ from jobmecloud.db.models import Job
 from jobmecloud.jobs.tracking import change_status, log
 from jobmecloud.llm.pricing import CostTracker
 from jobmecloud.llm.types import Provider
+from jobmecloud.resumes.context import pick_resume, ready_cards
 from jobmecloud.resumes.mapping import ResumeMapping, keys_match
 from jobmecloud.resumes.store import (
     ResumeEntry,
@@ -109,18 +110,19 @@ def make_docs(
     resume_id: str | None = None,
 ) -> DocsResult:
     today = now.astimezone().date()
+    resume_id, chosen = _choose_resume(data_dir, engine, job_id, provider, model, costs, resume_id)
     inputs = _load_inputs(data_dir, engine, job_id, resume_id)
     draft, problems = _draft(provider, model, inputs, costs, feedback)
     draft, check_notes = code_check(draft, inputs.resume, inputs.profile, inputs.headline)
     links = _links_to_add(inputs, feedback)
     rendered = _render(inputs, draft, counter, today, links)
-    rendered.note = _say_what_happened(rendered.note, links, draft.not_applied)
+    rendered.note = _say_what_happened(rendered.note, links, draft.not_applied, chosen)
 
     folder, _ = _open_folder(data_dir, inputs.settings, inputs.job, today, now)
     (folder / "resume.docx").write_bytes(rendered.resume)
     (folder / COVER_NAME).write_bytes(rendered.letter)
     write_job_md(folder, inputs.job)
-    write_notes_md(folder, inputs.job, changes=[*draft.changes, *[f"Not applied: {n}" for n in draft.not_applied], *problems], check_notes=check_notes,
+    write_notes_md(folder, inputs.job, changes=[*([chosen] if chosen else []), *draft.changes, *[f"Not applied: {n}" for n in draft.not_applied], *problems], check_notes=check_notes,
                    page_note=rendered.note, resume_name=inputs.entry.name, as_is=False)
     _mark_done(engine, job_id, folder, rendered.note, now)
     return DocsResult(folder, rendered.note)
@@ -229,6 +231,29 @@ def _render(inputs: _Inputs, draft: Draft, counter: PageCounter, today: date, li
     return _Rendered(fit.docx, letter, fit.note)
 
 
+AUTO = "auto"
+
+
+def _choose_resume(data_dir: Path, engine: Engine, job_id: int, provider: Provider, model: str, costs: CostTracker,
+                   resume_id: str | None) -> tuple[str | None, str | None]:
+    """The resume to start from. A named resume is used as is. With none named, or "auto", the resume whose profile
+    is closest to the job is picked when profiles exist, and otherwise the default is used."""
+    if resume_id and resume_id != AUTO:
+        return resume_id, None
+    cards = ready_cards(data_dir)
+    if len(cards) < 2:
+        return None, None
+    entry = default_entry(data_dir)
+    try:
+        pick = pick_resume(provider, model, _load_job(engine, job_id), cards, entry.id if entry else None, costs)
+    except Exception:  # choosing is a convenience: if it fails the default is used
+        return None, None
+    if pick is None:
+        return None, None
+    name = next((e.name for e, _ in cards if e.id == pick.resume_id), pick.resume_id)
+    return pick.resume_id, f"Started from {name} (best match: {pick.reason.rstrip('.')})."
+
+
 def _links_to_add(inputs: _Inputs, feedback: str | None) -> list[str]:
     """The links the user typed that belong on the contact line and are not there yet."""
     links = feedback_links(feedback)
@@ -241,8 +266,10 @@ def _links_to_add(inputs: _Inputs, feedback: str | None) -> list[str]:
     return [] if at is None else new_links(paragraphs[at][0], links)
 
 
-def _say_what_happened(note: str, links: list[str], not_applied: list[str]) -> str:
+def _say_what_happened(note: str, links: list[str], not_applied: list[str], chosen: str | None = None) -> str:
     parts = [note]
+    if chosen:
+        parts.append(chosen)
     if links:
         parts.append(f"Added to your contact line: {', '.join(links)}.")
     if not_applied:

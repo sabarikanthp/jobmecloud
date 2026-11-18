@@ -1,13 +1,15 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeDocs, useAsIs, type ResumeEntry } from '../api.ts'
+import { draftResume, makeDocs, saveNewResume, useAsIs, type ResumeEntry } from '../api.ts'
 import DocsActions from './DocsActions.tsx'
 import type { DocsRunner } from './docsTypes.ts'
 
 vi.mock('../api.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api.ts')>()),
   makeDocs: vi.fn(),
+  draftResume: vi.fn(),
+  saveNewResume: vi.fn(),
   useAsIs: vi.fn(),
   openDoc: vi.fn(),
 }))
@@ -28,13 +30,13 @@ const runDocs: DocsRunner = async (_id, action) => {
 let container: HTMLDivElement
 let root: Root
 
-async function mount(props: { hasDocs: boolean; resumes?: ResumeEntry[] }) {
+async function mount(props: { hasDocs: boolean; resumes?: ResumeEntry[]; onResumeAdded?: () => void }) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () =>
     root.render(
-      <DocsActions job={JOB} resumes={props.resumes ?? RESUMES} defaultId="main" busyId={null} runDocs={runDocs} makeable hasDocs={props.hasDocs} />,
+      <DocsActions job={JOB} resumes={props.resumes ?? RESUMES} defaultId="main" busyId={null} runDocs={runDocs} makeable hasDocs={props.hasDocs} onResumeAdded={props.onResumeAdded} />,
     ),
   )
 }
@@ -79,23 +81,33 @@ describe('DocsActions feedback and source', () => {
   it('offers a Start from list of the library and sends the chosen resume', async () => {
     await mount({ hasDocs: true })
     await click(button('Regenerate'))
-    expect(Array.from(startFrom()!.options).map((o) => o.text)).toEqual(['Main resume (default)', 'Initech version'])
+    expect(Array.from(startFrom()!.options).map((o) => o.text)).toEqual(['Best match (automatic)', 'Main resume (default)', 'Initech version'])
     await choose(startFrom()!, 'initech')
     await click(button('Regenerate'))
     expect(makeDocs).toHaveBeenCalledWith(7, null, 'initech')
   })
 
-  it('does not send a resume when the default is kept', async () => {
+  it('sends no resume when Best match (automatic) is kept, so the server picks', async () => {
     await mount({ hasDocs: true })
     await click(button('Regenerate'))
     await click(button('Regenerate'))
     expect(makeDocs).toHaveBeenCalledWith(7, null, null)
   })
 
-  it('has no Start from list when there is only one resume', async () => {
-    await mount({ hasDocs: true, resumes: [RESUMES[0]!] })
+  it('uploads a different resume on the spot, saves it to the library and starts from it', async () => {
+    vi.mocked(draftResume).mockResolvedValue({
+      upload_id: 'u1', kind: 'docx', filename: 'New one.docx', reading: { summary: 's', roles: [], skills: [], education: [], certifications: [] },
+      mapping: { paragraphs: [] }, map_error: null,
+    } as never)
+    vi.mocked(saveNewResume).mockResolvedValue({ id: 'fresh' } as never)
+    const added = vi.fn()
+    await mount({ hasDocs: true, onResumeAdded: added })
     await click(button('Regenerate'))
-    expect(startFrom()).toBeNull()
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [new File(['x'], 'New one.docx')], configurable: true })
+    await act(async () => void input.dispatchEvent(new Event('change', { bubbles: true })))
+    expect(saveNewResume).toHaveBeenCalledWith(expect.objectContaining({ upload_id: 'u1', name: 'New one', make_default: false }))
+    expect(added).toHaveBeenCalled()
   })
 
   it('says which resume is now in use after Use as-is', async () => {

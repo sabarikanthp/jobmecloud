@@ -1,3 +1,4 @@
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +14,9 @@ from jobmecloud.config.settings import load_settings
 from jobmecloud.importers.text import ImportFileError, extract_text
 from jobmecloud.llm.connection import friendly_message
 from jobmecloud.llm.errors import ProviderError
+from jobmecloud.llm.pricing import CostTracker
 from jobmecloud.llm.steps import StepNotConfiguredError, provider_for_step
+from jobmecloud.resumes import context
 from jobmecloud.resumes.mapping import (
     MAP_FAIL_COPY,
     ResumeMapping,
@@ -207,3 +210,38 @@ def delete(resume_id: str, request: Request) -> Response:
     except ValueError as e:
         raise HTTPException(400, str(e)) from None
     return Response(status_code=204)
+
+
+CONTEXT_BUDGET_SECONDS = 18  # stop starting new profiles well before the API function's 30 seconds
+
+
+@router.get("/resumes/context")
+def context_status(request: Request) -> dict:
+    rows = context.status(request.app.state.data_dir)
+    return {"resumes": rows, "pending": sum(1 for r in rows if r["state"] != "ready")}
+
+
+@router.post("/resumes/context/build")
+def context_build(request: Request) -> dict:
+    """Write a profile for each resume that has none or has changed, as many as fit in one request; the page asks again."""
+    state = request.app.state
+    data_dir = state.data_dir
+    try:
+        provider, model = provider_for_step(load_settings(data_dir), "extract", state.provider_builder)
+    except StepNotConfiguredError as e:
+        raise HTTPException(400, str(e)) from None
+    settings = load_settings(data_dir)
+    costs = CostTracker(settings.prices, settings.caps.max_spend_per_run_usd)
+    started, built, errors = time.monotonic(), 0, []
+    for rid in context.pending(data_dir):
+        if time.monotonic() - started > CONTEXT_BUDGET_SECONDS:
+            break
+        entry = get_entry(data_dir, rid)
+        try:
+            context.build_card(provider, model, entry, load_reading(data_dir, rid), costs, data_dir)
+            built += 1
+        except ProviderError as e:
+            errors.append(f"{entry.name}: {friendly_message(e)}")
+            break  # the same problem would stop the rest too
+    left = len(context.pending(data_dir))
+    return {"built": built, "pending": left, "errors": errors, "cost_usd": round(costs.cost, 4)}

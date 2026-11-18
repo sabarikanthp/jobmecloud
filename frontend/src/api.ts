@@ -232,6 +232,17 @@ export interface NewResumeBody {
 
 export const listResumes = () => request<ResumeList>('/resumes')
 
+export interface ContextStatus {
+  resumes: { id: string; name: string; state: 'ready' | 'stale' | 'missing' }[]
+  pending: number
+}
+
+export const getContextStatus = () => request<ContextStatus>('/resumes/context')
+
+// Writes profiles for as many resumes as fit in one request; ask again while `pending` is above zero.
+export const buildContext = () =>
+  request<{ built: number; pending: number; errors: string[]; cost_usd: number }>('/resumes/context/build', { method: 'POST' })
+
 // Returns a draft only. Nothing is saved until saveNewResume is called.
 export const draftResume = (file: File) => {
   const body = new FormData()
