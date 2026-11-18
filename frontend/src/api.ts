@@ -349,7 +349,7 @@ export const commitTracker = (body: ImportCommit) => commitSheet('/import/tracke
 export const previewWatchlistImport = (file: File) => previewSheet('/import/watchlist/preview', file)
 export const commitWatchlistImport = (body: ImportCommit) => commitSheet('/import/watchlist/commit', body)
 
-export type RunOutcome = 'new' | 'duplicate' | 'excluded' | 'matched' | 'prepared' | 'closed'
+export type RunOutcome = 'new' | 'duplicate' | 'excluded' | 'matched' | 'prepared' | 'closed' | 'repeat'
 
 export interface RunInfo {
   id: number
@@ -386,6 +386,8 @@ export interface JobSummary {
   liveness: string | null
   status: string
   repost_of_id: number | null
+  duplicate_of?: RelatedJob | null
+  looks_like?: RelatedJob | null
   docs_folder: string | null
   docs_note: string | null
   docs_error: string | null
@@ -562,6 +564,9 @@ export interface JobDetail extends JobRow {
   skip_note: string | null
   liveness: string | null
   repost_of_id: number | null
+  duplicate_of?: RelatedJob | null
+  looks_like?: RelatedJob | null
+  also_seen_as?: { id: number; employer: string; title: string; status: string }[]
   docs_folder: string | null
   docs_note: string | null
   docs_error: string | null
@@ -585,6 +590,7 @@ export interface StatusResult {
 
 export interface StatusBody {
   status: string
+  duplicate_of?: number | null
   date?: string | null
   skip_reason?: string | null
   skip_note?: string | null
@@ -652,6 +658,36 @@ export const patchJob = (
 
 export const addJob = (body: { employer: string; title: string; apply_url?: string | null; location?: string | null; notes?: string | null }) =>
   request<{ id: number; status: string }>('/jobs', post(body))
+
+export interface RelatedJob {
+  id: number
+  employer: string
+  title: string
+  status: string
+  decided: string | null
+  decided_date: string | null
+}
+
+export interface SimilarMatch extends RelatedJob {
+  strength: 'strong' | 'possible'
+  reasons: string[]
+}
+
+export interface SimilarVerdict extends RelatedJob {
+  same: 'same' | 'different' | 'unsure'
+  reason: string
+}
+
+export const getSimilar = (id: number) => request<{ matches: SimilarMatch[] }>(`/jobs/${id}/similar`)
+
+export const askSimilar = (id: number) =>
+  request<{ verdicts: SimilarVerdict[]; message: string | null; model: string | null; cost_usd: number }>(
+    `/jobs/${id}/similar/ask`,
+    { method: 'POST' },
+  )
+
+export const saveDescription = (id: number, text: string) =>
+  request<{ details_read: boolean; message: string | null; truncated: boolean }>(`/jobs/${id}/description`, post({ text }))
 
 export interface CheckedJob {
   id: number

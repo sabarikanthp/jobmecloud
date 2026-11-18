@@ -52,10 +52,10 @@ afterEach(async () => {
 describe('AddResumeFolder', () => {
   it('lists what it will read, skipping other file types, Word temp files and resumes already in the library', async () => {
     await mount(['Old one'])
-    await pick([file('CVS.docx'), file('Marriott.pdf'), file('notes.xlsx'), file('~$CVS.docx'), file('Old one.docx')])
+    await pick([file('Initech.docx'), file('Hooli.pdf'), file('notes.xlsx'), file('~$Initech.docx'), file('Old one.docx')])
     expect(container.textContent).toContain('2 resumes')
-    expect(container.textContent).toContain('CVS')
-    expect(container.textContent).toContain('Marriott')
+    expect(container.textContent).toContain('Initech')
+    expect(container.textContent).toContain('Hooli')
     expect(container.textContent).not.toContain('notes')
     expect(container.textContent).toMatch(/already in your library|skipped/i)
     expect(draftResume).not.toHaveBeenCalled() // nothing is read until Start is pressed
@@ -63,11 +63,11 @@ describe('AddResumeFolder', () => {
 
   it('reads and saves each file, named after the file, never as the default', async () => {
     await mount()
-    await pick([file('CVS_Lead.docx'), file('Marriott.pdf')])
+    await pick([file('Initech_Lead.docx'), file('Hooli.pdf')])
     await act(async () => void button('Add these resumes')!.click())
     expect(draftResume).toHaveBeenCalledTimes(2)
-    expect(saveNewResume).toHaveBeenCalledWith(expect.objectContaining({ upload_id: 'up-CVS_Lead.docx', name: 'CVS_Lead', make_default: false }))
-    expect(saveNewResume).toHaveBeenCalledWith(expect.objectContaining({ upload_id: 'up-Marriott.pdf', name: 'Marriott', mapping: null, make_default: false }))
+    expect(saveNewResume).toHaveBeenCalledWith(expect.objectContaining({ upload_id: 'up-Initech_Lead.docx', name: 'Initech_Lead', make_default: false }))
+    expect(saveNewResume).toHaveBeenCalledWith(expect.objectContaining({ upload_id: 'up-Hooli.pdf', name: 'Hooli', mapping: null, make_default: false }))
     expect(container.textContent).toContain('Added 2 of 2')
     expect(done).toHaveBeenCalled()
   })

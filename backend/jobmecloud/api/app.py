@@ -28,6 +28,7 @@ from jobmecloud.api import (
     routes_runs,
     routes_schedule,
     routes_settings,
+    routes_similar,
     routes_setup,
     routes_sheet_import,
     routes_tracking,
@@ -122,6 +123,7 @@ def create_app(
     app.include_router(routes_schedule.router, prefix="/api")
     app.include_router(routes_resumes.router, prefix="/api")
     app.include_router(routes_check.router, prefix="/api")  # before the {id} routes, so "check" is not read as an id
+    app.include_router(routes_similar.router, prefix="/api")
     app.include_router(routes_joblist.router, prefix="/api")
     app.include_router(routes_jobs.router, prefix="/api")
     app.include_router(routes_followups.router, prefix="/api")

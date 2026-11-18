@@ -128,7 +128,7 @@ def write_notes_md(folder: Path, job: Job, *, changes: list[str], check_notes: l
     (folder / "notes.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-# Words that end a company name without being the name ("CVS Health" is "CVS" on a file).
+# Words that end a company name without being the name ("Initech Health" is "Initech" on a file).
 _COMPANY_TAIL = {"inc", "llc", "ltd", "corp", "corporation", "co", "company", "plc", "lp", "group", "holdings",
                  "health", "healthcare", "financial", "international", "technologies", "technology"}
 _TITLE_WORDS = 4
@@ -143,7 +143,7 @@ def _camel(words: list[str]) -> str:
 
 
 def document_filename(person: str, employer: str, title: str, kind: str, suffix: str) -> str:
-    """The name a downloaded resume or cover letter is saved under, e.g. Jordan_Example_CVS_LeadDirector.docx."""
+    """The name a downloaded resume or cover letter is saved under, e.g. Jordan_Example_Initech_LeadDirector.docx."""
     company_words = _words(employer)
     while len(company_words) > 1 and company_words[-1].lower() in _COMPANY_TAIL:
         company_words.pop()

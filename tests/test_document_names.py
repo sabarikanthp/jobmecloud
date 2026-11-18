@@ -4,14 +4,14 @@ from jobmecloud.applydocs.output import document_filename
 
 
 @pytest.mark.parametrize("person,employer,title,kind,suffix,expected", [
-    ("Jordan Example", "CVS Health", "Lead Director", "resume", ".docx", "Jordan_Example_CVS_LeadDirector.docx"),
-    ("Jordan Example", "CVS Health", "Lead Director", "cover_letter", ".docx", "Jordan_Example_CVS_LeadDirector_Cover.docx"),
-    ("Jordan Example", "OneMain Financial", "VP/Director, Software Engineering – Document Management",
-     "resume", ".pdf", "Jordan_Example_OneMain_VPDirectorSoftwareEngineering.pdf"),
-    ("Jordan Example", "Marriott International", "Director, DevCon Platform Engineering", "resume", ".docx",
-     "Jordan_Example_Marriott_DirectorDevConPlatformEngineering.docx"),
-    ("Jordan Example", "McGraw Hill", "Director, Software Engineering", "resume", ".docx",
-     "Jordan_Example_McGrawHill_DirectorSoftwareEngineering.docx"),
+    ("Jordan Example", "Initech Health", "Lead Director", "resume", ".docx", "Jordan_Example_Initech_LeadDirector.docx"),
+    ("Jordan Example", "Initech Health", "Lead Director", "cover_letter", ".docx", "Jordan_Example_Initech_LeadDirector_Cover.docx"),
+    ("Jordan Example", "Globex Financial", "VP/Director, Software Engineering – Document Management",
+     "resume", ".pdf", "Jordan_Example_Globex_VPDirectorSoftwareEngineering.pdf"),
+    ("Jordan Example", "Hooli International", "Director, DevCon Platform Engineering", "resume", ".docx",
+     "Jordan_Example_Hooli_DirectorDevConPlatformEngineering.docx"),
+    ("Jordan Example", "Umbrella Press", "Director, Software Engineering", "resume", ".docx",
+     "Jordan_Example_UmbrellaPress_DirectorSoftwareEngineering.docx"),
     ("Jordan Example", "Acme, Inc.", "VP", "resume", ".docx", "Jordan_Example_Acme_VP.docx"),
 ])
 def test_document_names_follow_the_pattern(person, employer, title, kind, suffix, expected):
@@ -19,7 +19,7 @@ def test_document_names_follow_the_pattern(person, employer, title, kind, suffix
 
 
 def test_a_missing_name_title_or_employer_never_leaves_a_gap_or_an_unsafe_name():
-    assert document_filename("", "CVS Health", "Lead Director", "resume", ".docx") == "CVS_LeadDirector.docx"
+    assert document_filename("", "Initech Health", "Lead Director", "resume", ".docx") == "Initech_LeadDirector.docx"
     assert document_filename("Jordan E", "", "", "resume", ".docx") == "Jordan_E.docx"
     assert document_filename("", "", "", "resume", ".docx") == "Resume.docx"
     assert document_filename("", "", "", "cover_letter", ".docx") == "Cover_Letter.docx"

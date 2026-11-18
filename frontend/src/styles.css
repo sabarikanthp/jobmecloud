@@ -238,10 +238,19 @@ details summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
   background: var(--bg);
   color: var(--text);
 }
-.status-badge.blue { background: #e6edfb; border-color: var(--accent); color: var(--accent); }
-.status-badge.green { background: #e3f4ea; border-color: var(--ok); color: var(--ok); }
-.status-badge.grey { background: #eceef2; border-color: var(--border); color: var(--muted); }
-.status-badge.red { background: #fdecea; border-color: var(--bad); color: var(--bad); }
+.status-badge.status-new { background: #ffffff; border-color: #7a869a; color: #1f2a37; }
+.status-badge.status-ready { background: #e0f5f2; border-color: #0f766e; color: #0f766e; }
+.status-badge.status-applied { background: #e6edfb; border-color: var(--accent); color: var(--accent); }
+.status-badge.status-interviewing { background: #f0e8fb; border-color: #6d28d9; color: #6d28d9; }
+.status-badge.status-offer { background: #fff4d6; border-color: #b7791f; color: #8a5a00; }
+.status-badge.status-accepted { background: #e3f4ea; border-color: var(--ok); color: var(--ok); }
+.status-badge.status-rejected { background: #fdecea; border-color: var(--bad); color: var(--bad); }
+.status-badge.status-withdrawn { background: #fdeee0; border-color: #b4540a; color: #b4540a; }
+.status-badge.status-skipped { background: #eceef2; border-color: var(--border); color: var(--muted); }
+.status-badge.status-closed { background: #dfe3e8; border-color: #475569; color: #475569; }
+.status-badge.status-unavailable { background: #f1ece6; border-color: #78604a; color: #78604a; }
+.status-badge.status-duplicate { background: #fbe8f3; border-color: #a21c6d; color: #a21c6d; }
+.status-badge.status-other { background: #eceef2; border-color: var(--border); color: var(--muted); }
 .status-actions { margin-top: 8px; }
 .inline-form { margin-top: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
 .inline-form label { display: block; font-weight: 600; }
@@ -331,3 +340,9 @@ label.check { display: inline-flex; align-items: center; gap: 6px; font-weight: 
 .fit-score strong { font-size: 2rem; }
 .fit-good { color: var(--ok); }
 .fit-low { color: #c0392b; }
+.repeat-banner { margin: 8px 0; padding: 6px 10px; border-left: 3px solid #a21c6d; background: #fbf0f6; border-radius: 4px; font-size: 14px; }
+.repeat-banner p { margin: 4px 0; }
+.duplicate-list { list-style: none; margin: 8px 0; padding: 0; }
+.duplicate-candidate { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.duplicate-picker input[type='search'] { min-width: 14rem; }
+.re-evaluate textarea { width: 100%; box-sizing: border-box; font: inherit; }

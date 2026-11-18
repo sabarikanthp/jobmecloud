@@ -8,8 +8,8 @@ C = ["Owned technology and product strategy for a multi-product SaaS portfolio."
      "Managed technology budgets, vendor relationships and engineering allocation."]
 SUMMARY = "Engineering executive leading enterprise SaaS and cloud platform engineering teams."
 READING = MasterResume(summary=SUMMARY, roles=[
-    ResumeRole(employer="DuploCloud", title="Senior Director of Engineering", start="January 2024", end="October 2026", bullets=B),
-    ResumeRole(employer="Workuments", title="Chief Technology Officer", start="May 2015", end="December 2023", bullets=C),
+    ResumeRole(employer="Tailspin Cloud", title="Senior Director of Engineering", start="January 2024", end="October 2026", bullets=B),
+    ResumeRole(employer="Fabrikam Systems", title="Chief Technology Officer", start="May 2015", end="December 2023", bullets=C),
 ], skills=["Python"])
 
 
@@ -27,12 +27,12 @@ def broken_like_production() -> ResumeMapping:
         para(3, SUMMARY, "summary"),
         para(4, "Professional Experience", "keep"),
         para(5, "Senior Director of Engineering", "keep"),
-        para(6, "DuploCloud | Remote | January 2024 – October 2026", "bullet:0:0"),
+        para(6, "Tailspin Cloud | Remote | January 2024 – October 2026", "bullet:0:0"),
         para(7, B[0], "bullet:0:1"),
         para(8, B[1], "bullet:0:2"),
         para(9, B[2], "keep"),
         para(10, "Chief Technology Officer", "keep"),
-        para(11, "Workuments | Maryland | May 2015 – December 2023", "bullet:1:0"),
+        para(11, "Fabrikam Systems | Maryland | May 2015 – December 2023", "bullet:1:0"),
         para(12, C[0], "bullet:1:1"),
         para(13, C[1], "keep"),
     ])

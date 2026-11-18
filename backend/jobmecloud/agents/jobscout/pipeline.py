@@ -30,6 +30,7 @@ from jobmecloud.config.settings import DAYS, ProviderConfig, Settings, load_sett
 from jobmecloud.db.models import Job, Run, RunJob, WatchlistEmployer
 from jobmecloud.db.retry import retry_on_conflict
 from jobmecloud.jobs.dedup import dedup_key, fallback_key, normalize_url
+from jobmecloud.jobs.similar import Match, find_similar
 from jobmecloud.jobs.tracking import change_status, log
 from contextlib import nullcontext
 
@@ -48,6 +49,7 @@ UNREADABLE_FLAG = "Couldn't read the posting"
 NOT_READ_FLAG = "Not read: spending limit reached"
 AI_FAILED_FLAG = "Not read: the AI step failed"
 REPOST_FLAG = "Repost"
+POSSIBLE_REPEAT_FLAG = "Possibly seen before"
 NO_ROLES_COPY = "Add at least one job title in What you're looking for."
 NO_SEARCH_SERVICE_COPY = "Choose a search service (Tavily or Brave) in Settings > AI connection."
 NO_SEARCH_KEY_COPY = "Add your search key in Settings > AI connection."
@@ -370,13 +372,23 @@ def _read_new(ctx: _Context, c: Candidate, indexes: _Indexes) -> None:
         return
     repost_of = indexes.fallback.get(fallback_key(posting.employer, posting.title, posting.location))
 
+    # Look through everything already in the tracker, including jobs you decided on, before spending on more AI.
+    matches = _find_similar(ctx, posting)
+    strong = next((m for m in matches if m.strength == "strong"), None)
+    if strong is not None:
+        _save_repeat(ctx, posting, c, state, strong.job.id, indexes)
+        return
+    possibly_seen = False
+    if repost_of is None and matches:
+        repost_of, possibly_seen = _original_id(ctx, matches[0].job.id), True
+
     if state == "unclear":
         provider, model = ctx.models["liveness"]
         state = classify_unclear(provider, model, page.text, c.title, ctx.costs)
 
     job = _job_from_posting(ctx, posting, c, state)
     job.repost_of_id = repost_of
-    flags = [REPOST_FLAG] if repost_of is not None else []
+    flags = [POSSIBLE_REPEAT_FLAG if possibly_seen else REPOST_FLAG] if repost_of is not None else []
     if readable:
         flags += code_flags(posting, ctx.profile, ctx.now.astimezone().date())
     else:
@@ -405,6 +417,32 @@ def _read_new(ctx: _Context, c: Candidate, indexes: _Indexes) -> None:
 
     job.flags, job.hard_rules = flags, hard_rules
     _save_new_job(ctx, job, outcome, indexes, c.url)
+
+
+def _find_similar(ctx: _Context, posting: Posting) -> list[Match]:
+    with Session(ctx.engine) as session:
+        return find_similar(session, employer=posting.employer, title=posting.title, location=posting.location,
+                            requisition_id=posting.requisition_id, url=posting.apply_url, description=posting.description)
+
+
+def _original_id(ctx: _Context, job_id: int) -> int:
+    """The job a repeat should point at: if that job is itself a duplicate, the one it points at."""
+    with Session(ctx.engine) as session:
+        seen = {job_id}
+        job = session.get(Job, job_id)
+        while job is not None and job.status == "Duplicate" and job.repost_of_id and job.repost_of_id not in seen:
+            seen.add(job.repost_of_id)
+            job = session.get(Job, job.repost_of_id) or job
+        return job.id if job is not None else job_id
+
+
+def _save_repeat(ctx: _Context, posting: Posting, c: Candidate, state: str, earlier_id: int,
+                 indexes: _Indexes) -> None:
+    """A job that is the same as one already in the tracker: keep a Duplicate with its link and spend nothing on it."""
+    job = _job_from_posting(ctx, posting, c, state)
+    job.status, job.repost_of_id, job.outcome_at = "Duplicate", _original_id(ctx, earlier_id), ctx.now
+    _insert_job(ctx, job, "repeat")
+    indexes.add(job, c.url)
 
 
 def _report_note(c: Candidate) -> str | None:

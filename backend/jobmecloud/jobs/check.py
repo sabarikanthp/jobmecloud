@@ -15,7 +15,7 @@ from sqlmodel import Session, select
 from jobmecloud.agents.jobscout.extract import Posting, extract_posting
 from jobmecloud.agents.jobscout.liveness import check_page
 from jobmecloud.agents.jobscout.rules import code_flags, code_rules
-from jobmecloud.agents.jobscout.pipeline import REPOST_FLAG
+from jobmecloud.agents.jobscout.pipeline import AI_FAILED_FLAG, NOT_READ_FLAG, REPOST_FLAG, UNREADABLE_FLAG
 from jobmecloud.agents.jobscout.score import score_job
 from jobmecloud.agents.jobscout.search_agent import Candidate
 from jobmecloud.config.defaults import STEP_NAMES
@@ -73,7 +73,7 @@ def classify_input(raw: str) -> tuple[Literal["link", "text"], str]:
     return "text", text
 
 
-def _within(deadline: float, fn: Callable, *args):
+def within(deadline: float, fn: Callable, *args):
     """Run `fn`, giving up with a plain message once the deadline passes (the work may finish unseen)."""
     remaining = deadline - time.monotonic()
     if remaining <= 0:
@@ -157,7 +157,7 @@ def read_job(
         known = _known_by_address(session, text)
         if known is not None and (known.description or "").strip():
             return {"status": "duplicate", "job": known, "truncated": False}
-        page = _within(deadline, fetch, text)
+        page = within(deadline, fetch, text)
         state = check_page(page, "")
         if state == "closed":
             raise CheckError(CLOSED_COPY, 422)
@@ -171,7 +171,7 @@ def read_job(
     body = body[:MAX_TEXT_CHARS]
     costs = CostTracker(prices, cap)
     candidate = Candidate(url=link, employer="", title="")
-    posting = _within(deadline, extract_posting, provider, model, candidate, FetchResult(link, 200, body), costs)
+    posting = within(deadline, extract_posting, provider, model, candidate, FetchResult(link, 200, body), costs)
     if not posting.employer.strip() or not posting.title.strip():
         raise CheckError(MISSING_COPY, 422)
 
@@ -266,7 +266,7 @@ def fit_job(
     posting = _posting_of(job)
     costs = CostTracker(settings.prices, settings.caps.max_spend_per_run_usd)
     # May raise or run out of time: nothing is touched yet.
-    result = _within(deadline, score_job, provider, model, posting, profile, resume, costs)
+    result = within(deadline, score_job, provider, model, posting, profile, resume, costs)
 
     rules = [r.as_dict() for r in code_rules(posting, profile)] + [d.as_dict() for d in result.deal_breakers]
     kept = [REPOST_FLAG] if REPOST_FLAG in (job.flags or []) else []
@@ -279,3 +279,63 @@ def fit_job(
     session.commit()
     session.refresh(job)
     return FitResult(result.score, result.reasons, result.gaps, result.warnings, rules, model, costs.cost)
+
+
+@dataclass
+class DescriptionResult:
+    details_read: bool
+    message: str | None
+    truncated: bool
+
+
+_FILLED = ("requisition_id", "location", "work_mode", "pay_min", "pay_max", "posted_date")
+
+
+def add_description(
+    session: Session,
+    job: Job,
+    *,
+    text: str,
+    provider: Provider,
+    model: str,
+    prices: dict[str, Price],
+    cap: float,
+    now: datetime,
+) -> DescriptionResult:
+    """Keep a pasted job description on a job that could not be read, and read its details.
+
+    The text is saved first, so it is never lost if reading the details fails or runs out of time. The job's
+    employer and title are never changed, and a detail the job already has is never overwritten.
+    """
+    deadline = time.monotonic() + CHECK_BUDGET_SECONDS
+    text = (text or "").strip()
+    if len(text) < MIN_TEXT_CHARS:
+        raise CheckError(TOO_SHORT_COPY, 422)
+    truncated = len(text) > MAX_TEXT_CHARS
+    text = text[:MAX_TEXT_CHARS]
+
+    job.description = text[:20_000]
+    job.flags = [f for f in (job.flags or []) if f not in (UNREADABLE_FLAG, NOT_READ_FLAG, AI_FAILED_FLAG)]
+    session.add(job)
+    tracking.log(session, entity_type="job", entity_id=job.id, job_id=job.id, action="description_added", at=now,
+                 note="Description pasted by hand")
+    session.commit()
+
+    try:
+        costs = CostTracker(prices, cap)
+        candidate = Candidate(url=job.apply_url or "", employer=job.employer, title=job.title)
+        posting = within(deadline, extract_posting, provider, model, candidate, FetchResult(candidate.url, 200, text), costs)
+    except CheckError as e:
+        return DescriptionResult(False, e.message, truncated)
+    except Exception as e:  # the text is already kept; a failed read only means the details stay as they were
+        from jobmecloud.llm.connection import friendly_message
+        return DescriptionResult(False, friendly_message(e), truncated)
+    for field in _FILLED:
+        if not getattr(job, field) and getattr(posting, field):
+            setattr(job, field, getattr(posting, field))
+    if job.pay_min or job.pay_max:
+        job.pay_verified = True
+        job.flags = [f for f in job.flags if f != "Pay unverified"]
+    session.add(job)
+    session.commit()
+    return DescriptionResult(True, None, truncated)

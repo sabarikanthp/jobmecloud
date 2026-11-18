@@ -24,7 +24,7 @@ def test_run_now_and_results(client):
     assert latest["running"] is False and (latest["found"], latest["matched"]) == (1, 1)
     rows = client.get(f"/api/runs/{latest['id']}/jobs").json()
     assert rows[0]["outcome"] == "matched" and rows[0]["job"]["match_score"] == 90
-    assert rows[0]["job"]["allowed_next"] == ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable"]
+    assert rows[0]["job"]["allowed_next"] == ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable", "Duplicate"]
 
 
 def test_run_now_errors(client):

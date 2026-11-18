@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
-import { reopenJob, setStatus } from '../api.ts'
+import { getSimilar, reopenJob, setStatus } from '../api.ts'
 import { todayISO } from '../dates.ts'
 import RowStatus from './RowStatus.tsx'
 
@@ -9,6 +9,7 @@ vi.mock('../api.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api.ts')>()),
   setStatus: vi.fn(),
   reopenJob: vi.fn(),
+  getSimilar: vi.fn(),
 }))
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -41,6 +42,9 @@ async function choose(select: HTMLSelectElement, value: string) {
 }
 
 beforeEach(() => {
+  vi.mocked(getSimilar).mockReset().mockResolvedValue({
+    matches: [{ id: 5, employer: 'Northwind Labs', title: 'Director', status: 'Skipped', decided: null, decided_date: null, strength: 'strong', reasons: ['Same link'] }],
+  })
   vi.mocked(setStatus).mockReset().mockResolvedValue({ follow_up_id: null } as never)
   vi.mocked(reopenJob).mockReset().mockResolvedValue({} as never)
 })
@@ -50,6 +54,17 @@ afterEach(async () => {
 })
 
 describe('RowStatus', () => {
+  it('asks which job this repeats before marking a duplicate, then sends that job', async () => {
+    await mount({ id: 7, status: 'New', allowed_next: ['Applied', 'Duplicate'] })
+    await choose(status()!, 'Duplicate')
+    expect(setStatus).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Which job is this a duplicate of?')
+    const pick = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'This is the one')!
+    await act(async () => void pick.click())
+    expect(setStatus).toHaveBeenCalledWith(7, expect.objectContaining({ status: 'Duplicate', duplicate_of: 5 }))
+    expect(changed).toHaveBeenCalled()
+  })
+
   it('offers Unavailable and makes the move as soon as it is chosen', async () => {
     await mount({ id: 7, status: 'New', allowed_next: ['Applied', 'Unavailable'] })
     expect(optionTexts(status()!)).toContain('Unavailable')

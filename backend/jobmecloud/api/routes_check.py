@@ -7,7 +7,7 @@ from sqlmodel import Session
 from jobmecloud.config.profile import load_resume, load_search
 from jobmecloud.config.settings import load_settings
 from jobmecloud.db.models import Job
-from jobmecloud.jobs.check import CheckError, fit_job, model_choices, read_job
+from jobmecloud.jobs.check import CheckError, add_description, fit_job, model_choices, read_job
 from jobmecloud.jobs.tracking import allowed_next
 from jobmecloud.llm.connection import friendly_message
 from jobmecloud.llm.errors import ProviderError
@@ -89,3 +89,31 @@ def fit(job_id: int, body: FitIn, request: Request) -> dict:
             "job": {"id": job.id, "status": job.status, "allowed_next": allowed_next(job),
                     "match_score": job.match_score},
         }
+
+
+class DescriptionIn(BaseModel):
+    text: str = ""
+
+
+@router.post("/jobs/{job_id}/description")
+def description(job_id: int, body: DescriptionIn, request: Request) -> dict:
+    """Paste the job description for a job that could not be read, then judge it with POST /jobs/{id}/fit."""
+    state = request.app.state
+    settings = load_settings(state.data_dir)
+    try:
+        provider, model = provider_for_step(settings, "extract", state.provider_builder)
+    except StepNotConfiguredError as e:
+        raise HTTPException(400, str(e))
+    now = datetime.now(timezone.utc)
+    with Session(state.engine) as session:
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(404, "That job was not found.")
+        try:
+            result = add_description(session, job, text=body.text, provider=provider, model=model,
+                                     prices=settings.prices, cap=settings.caps.max_spend_per_run_usd, now=now)
+        except CheckError as e:
+            raise HTTPException(e.status, e.message)
+        session.refresh(job)
+        return {"details_read": result.details_read, "message": result.message, "truncated": result.truncated,
+                "job": {"id": job.id, "status": job.status, "allowed_next": allowed_next(job)}}

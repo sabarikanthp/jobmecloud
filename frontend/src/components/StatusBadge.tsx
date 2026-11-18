@@ -1,15 +1,20 @@
-const ROLE: Record<string, string> = {
-  Applied: 'blue',
-  Interviewing: 'blue',
-  Offer: 'blue',
-  Accepted: 'green',
-  Skipped: 'grey',
-  Withdrawn: 'grey',
-  Closed: 'grey',
-  Unavailable: 'grey',
-  Rejected: 'red',
-}
+// Every status has its own colour, so a list can be scanned at a glance. The colours are in styles.css.
+export const STATUS_ORDER = [
+  'New',
+  'Ready',
+  'Applied',
+  'Interviewing',
+  'Offer',
+  'Accepted',
+  'Rejected',
+  'Withdrawn',
+  'Skipped',
+  'Closed',
+  'Unavailable',
+  'Duplicate',
+] as const
 
 export default function StatusBadge({ status }: { status: string }) {
-  return <span className={`status-badge ${ROLE[status] ?? 'neutral'}`}>{status}</span>
+  const known = (STATUS_ORDER as readonly string[]).includes(status)
+  return <span className={`status-badge status-${known ? status.toLowerCase() : 'other'}`}>{status}</span>
 }

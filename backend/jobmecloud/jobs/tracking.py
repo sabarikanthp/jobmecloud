@@ -12,28 +12,30 @@ from sqlmodel import Session
 from jobmecloud.db.models import ActivityLog, Job
 
 OPEN = ("New", "Ready", "Applied", "Interviewing", "Offer")
-USER_STATUSES = ("Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable")
+USER_STATUSES = ("Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable", "Duplicate")
 SKIP_REASON_COPY = "Choose why you're skipping this job."
 FUTURE_DATE_COPY = "That date is in the future."
+DUPLICATE_COPY = "Pick the job this one repeats."
 NOT_ALLOWED_COPY = "That change isn't available for a job that is {status}."
 
 # What the user can do next, in order of preference. "Reopen" is an action, not a status.
 _USER_NEXT = {
-    "New": ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable"],
-    "Ready": ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable"],
-    "Closed": ["Applied", "Reopen"],
+    "New": ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable", "Duplicate"],
+    "Ready": ["Applied", "Skipped", "Rejected", "Withdrawn", "Unavailable", "Duplicate"],
+    "Closed": ["Applied", "Reopen", "Duplicate"],
     "Applied": ["Interviewing", "Offer", "Rejected", "Withdrawn", "Unavailable"],
     "Interviewing": ["Offer", "Rejected", "Withdrawn", "Unavailable"],
     "Offer": ["Accepted", "Rejected", "Withdrawn"],
     "Skipped": ["Reopen"],
     "Withdrawn": ["Reopen"],
     "Unavailable": ["Reopen"],  # set by hand when the job is gone or can't be pursued
+    "Duplicate": ["Reopen"],  # set by hand: the same job as one already in the tracker
 }
 # What the system may do: target status -> statuses it may come from.
 _SYSTEM_FROM = {"New": (), "Ready": ("New",), "Closed": ("New", "Ready")}
 
 _RESPONSE = ("Interviewing", "Offer", "Accepted", "Rejected")
-_OUTCOME = ("Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable")
+_OUTCOME = ("Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable", "Duplicate")
 
 
 class TrackingError(Exception):
@@ -87,9 +89,23 @@ def log(session: Session, *, entity_type: str, entity_id: int, job_id: int | Non
     return row
 
 
+def _original(session: Session, job: Job, duplicate_of: int | None) -> Job:
+    """The job this one repeats: it must exist and not be this job, and a repeat of a repeat points at the first."""
+    target = session.get(Job, duplicate_of) if duplicate_of is not None else None
+    if target is None or target.id == job.id:
+        raise TrackingError(DUPLICATE_COPY)
+    seen = {job.id, target.id}
+    while target.status == "Duplicate" and target.repost_of_id and target.repost_of_id not in seen:
+        seen.add(target.repost_of_id)
+        target = session.get(Job, target.repost_of_id) or target
+    if target.id == job.id:
+        raise TrackingError(DUPLICATE_COPY)
+    return target
+
+
 def change_status(session: Session, job: Job, to: str, *, actor: Literal["user", "system"], at: datetime,
                   on: date | None = None, skip_reason: str | None = None, skip_note: str | None = None,
-                  note: str | None = None, skip_reasons: Sequence[str] = ()) -> None:
+                  note: str | None = None, skip_reasons: Sequence[str] = (), duplicate_of: int | None = None) -> None:
     if actor == "system":
         if to not in _SYSTEM_FROM or job.status not in _SYSTEM_FROM[to]:
             return
@@ -104,6 +120,8 @@ def change_status(session: Session, job: Job, to: str, *, actor: Literal["user",
         on = on or today
         if on > today:
             raise TrackingError(FUTURE_DATE_COPY)
+        if to == "Duplicate":
+            original = _original(session, job, duplicate_of)
 
     old = job.status
     job.status = to
@@ -118,16 +136,20 @@ def change_status(session: Session, job: Job, to: str, *, actor: Literal["user",
         if to == "Skipped":
             job.skip_reason = skip_reason
             job.skip_note = skip_note
+        if to == "Duplicate":
+            job.repost_of_id = original.id
     session.add(job)
     log(session, entity_type="job", entity_id=job.id, job_id=job.id, action="status_changed",
         at=at, actor=actor, from_value=old, to_value=to, note=note)
 
 
 def reopen(session: Session, job: Job, *, at: datetime, note: str | None = None) -> None:
-    if job.status not in ("Skipped", "Withdrawn", "Closed", "Unavailable"):
+    if job.status not in ("Skipped", "Withdrawn", "Closed", "Unavailable", "Duplicate"):
         raise TrackingError(NOT_ALLOWED_COPY.format(status=job.status))
     old = job.status
     job.status = "Ready" if job.docs_folder else "New"
+    if old == "Duplicate":
+        job.repost_of_id = None
     job.skip_reason = None
     job.skip_note = None
     job.outcome_at = None

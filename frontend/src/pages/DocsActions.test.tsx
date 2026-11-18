@@ -16,7 +16,7 @@ vi.mock('../api.ts', async (importOriginal) => ({
 
 const RESUMES = [
   { id: 'main', name: 'Main resume', is_default: true },
-  { id: 'cvs', name: 'CVS version', is_default: false },
+  { id: 'initech', name: 'Initech version', is_default: false },
 ] as unknown as ResumeEntry[]
 const JOB = { id: 7, docs_note: null, docs_error: null }
 
@@ -79,10 +79,10 @@ describe('DocsActions feedback and source', () => {
   it('offers a Start from list of the library and sends the chosen resume', async () => {
     await mount({ hasDocs: true })
     await click(button('Regenerate'))
-    expect(Array.from(startFrom()!.options).map((o) => o.text)).toEqual(['Main resume (default)', 'CVS version'])
-    await choose(startFrom()!, 'cvs')
+    expect(Array.from(startFrom()!.options).map((o) => o.text)).toEqual(['Main resume (default)', 'Initech version'])
+    await choose(startFrom()!, 'initech')
     await click(button('Regenerate'))
-    expect(makeDocs).toHaveBeenCalledWith(7, null, 'cvs')
+    expect(makeDocs).toHaveBeenCalledWith(7, null, 'initech')
   })
 
   it('does not send a resume when the default is kept', async () => {

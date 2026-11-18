@@ -41,3 +41,12 @@ JobMeCloud recognises it (same requisition, same employer and title, or same lin
 Two small AI calls per job, usually a cent or two in total; the model and cost are shown with the fit. See [costs.md](costs.md).
 
 Problems? See [troubleshooting.md](troubleshooting.md#checking-a-job).
+
+## Duplicates and repeats
+
+- **Mark a job as a duplicate.** Choose **Duplicate…** from a job's status list (Jobs list, a job's page, or the Daily jobs page). JobMeCloud suggests the likely originals, with why each matches and what you decided about it. You can also search your tracker, or press **Ask the AI if I have seen this before** (one small call, about a cent), which compares the job's description with the closest earlier jobs. The duplicate keeps a link to the original, which shows "Also seen as" back. **Reopen** undoes it.
+- **Daily runs look through your history first.** After a job is read and before it is scored, it is checked against everything in your tracker, including jobs you skipped, rejected or applied for. The same job (same link, requisition, or employer and title) is saved as a Duplicate with a link and is not scored. A possible repeat (a reworded title, a new requisition, or the same posting text under another company name) stays New with a "Looks like ..." note, a button to mark it a duplicate, and a note of what you decided before.
+
+## A job that could not be read
+
+If JobMeCloud could not open a job's page, the job has no fit. Open it, find **Fit**, paste the job description, and press **Re-evaluate**. The description is saved first (and its details, such as pay and location, are read to fill in blanks), then the fit is judged with the AI you pick. A failed judgment keeps your description so you can retry. **Re-evaluate** also works on any job, for a second opinion from a different AI.
