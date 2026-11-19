@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { fmtDate, followUpAction, type FollowUpAction, type FollowUpRow } from '../api.ts'
-import { todayISO, tomorrowISO } from '../dates.ts'
+import { daysFromTodayISO, todayISO, tomorrowISO } from '../dates.ts'
 import { useNav } from '../nav.tsx'
 import { errorText } from '../pages/jobFormat.ts'
 
@@ -11,13 +11,17 @@ function Row({ row, onChanged, compact }: { row: FollowUpRow; onChanged: () => v
   const [form, setForm] = useState<FollowUpAction | null>(null)
   const [date, setDate] = useState('')
   const [outcome, setOutcome] = useState('')
+  const [again, setAgain] = useState(false) // also schedule another follow-up when this one is done
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   function begin(next: FollowUpAction) {
     setForm(next)
-    setDate(next === 'snooze' ? tomorrowISO() : row.due_date >= todayISO() ? row.due_date : todayISO())
+    setDate(
+      next === 'snooze' ? tomorrowISO() : next === 'done' ? daysFromTodayISO(7) : row.due_date >= todayISO() ? row.due_date : todayISO(),
+    )
     setOutcome('')
+    setAgain(false)
     setError('')
   }
 
@@ -37,7 +41,7 @@ function Row({ row, onChanged, compact }: { row: FollowUpRow; onChanged: () => v
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    if (form === 'done') void run('done', { outcome_note: outcome.trim() || null })
+    if (form === 'done') void run('done', { outcome_note: outcome.trim() || null, next_date: again ? date : null })
     else if (form === 'snooze') void run('snooze', { until: date })
     else if (form === 'reschedule') void run('reschedule', { due_date: date })
   }
@@ -82,10 +86,21 @@ function Row({ row, onChanged, compact }: { row: FollowUpRow; onChanged: () => v
       {form && (
         <form className="inline-form" onSubmit={submit}>
           {form === 'done' ? (
-            <div className="field">
-              <label htmlFor={`${id}-outcome`}>What happened? (optional)</label>
-              <input id={`${id}-outcome`} type="text" value={outcome} onChange={(e) => setOutcome(e.target.value)} />
-            </div>
+            <>
+              <div className="field">
+                <label htmlFor={`${id}-outcome`}>What happened? (optional)</label>
+                <input id={`${id}-outcome`} type="text" value={outcome} onChange={(e) => setOutcome(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor={`${id}-again`}>
+                  <input id={`${id}-again`} type="checkbox" checked={again} onChange={(e) => setAgain(e.target.checked)} /> Follow up
+                  again
+                </label>
+                {again && (
+                  <input aria-label="Follow up again on" type="date" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} />
+                )}
+              </div>
+            </>
           ) : (
             <div className="field">
               <label htmlFor={`${id}-date`}>{form === 'snooze' ? 'Snooze until' : 'New date'}</label>
@@ -93,7 +108,7 @@ function Row({ row, onChanged, compact }: { row: FollowUpRow; onChanged: () => v
             </div>
           )}
           <div className="row">
-            <button type="submit" className="primary" disabled={busy || (form !== 'done' && !date)}>
+            <button type="submit" className="primary" disabled={busy || ((form !== 'done' || again) && !date)}>
               {FORMS[form]}
             </button>
             <button type="button" disabled={busy} onClick={() => setForm(null)}>

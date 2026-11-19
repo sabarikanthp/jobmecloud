@@ -752,7 +752,7 @@ export const addFollowUp = (body: { type: string; due_date: string; job_id?: num
 
 export type FollowUpAction = 'done' | 'snooze' | 'reschedule' | 'cancel'
 
-export const followUpAction = (id: number, action: FollowUpAction, body: { outcome_note?: string | null; until?: string; due_date?: string } = {}) =>
+export const followUpAction = (id: number, action: FollowUpAction, body: { outcome_note?: string | null; next_date?: string | null; until?: string; due_date?: string } = {}) =>
   request<FollowUpRow>(`/followups/${id}/${action}`, post(body))
 
 export interface ContactBody {
