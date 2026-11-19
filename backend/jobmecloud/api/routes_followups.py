@@ -26,6 +26,7 @@ class FollowUpIn(BaseModel):
 
 class DoneIn(BaseModel):
     outcome_note: str | None = None
+    next_date: date | None = None  # also schedule the same kind of follow-up again on this date
 
 
 class SnoozeIn(BaseModel):
@@ -153,8 +154,18 @@ def _act(request: Request, followup_id: int, action) -> FollowUpRow:
 @router.post("/followups/{followup_id}/done")
 def done(followup_id: int, request: Request, body: DoneIn | None = None) -> FollowUpRow:
     note = body.outcome_note if body else None
-    return _act(request, followup_id,
-                lambda s, fu, t: fu_rules.complete(s, fu, at=_now(), outcome_note=note))
+    next_date = body.next_date if body else None
+
+    def action(s: Session, fu: FollowUp, today: date) -> None:
+        if next_date is not None and next_date < today:
+            raise TrackingError(fu_rules.PAST_DATE_COPY)  # checked first, so nothing is half done
+        at = _now()
+        fu_rules.complete(s, fu, at=at, outcome_note=note)
+        if next_date is not None:
+            fu_rules.create_followup(s, type=fu.type, due=next_date, at=at, job_id=fu.job_id,
+                                     contact_id=fu.contact_id, note=fu.note)
+
+    return _act(request, followup_id, action)
 
 
 @router.post("/followups/{followup_id}/snooze")

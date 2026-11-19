@@ -35,6 +35,29 @@ def test_followup_flow(client):
     assert [x["id"] for x in client.get("/api/followups?bucket=done").json()] == [row["id"]]
 
 
+def test_done_can_schedule_the_next_follow_up(client):
+    client.app.state.today = lambda: date(2026, 11, 12)
+    jid = _job(client)
+    fu = client.post("/api/followups", json={"type": "Recruiter outreach", "due_date": "2026-11-12",
+                                              "job_id": jid, "note": "Ping about timing"}).json()
+    d = client.post(f"/api/followups/{fu['id']}/done", json={"outcome_note": "Sent", "next_date": "2026-11-19"})
+    assert d.status_code == 200 and d.json()["status"] == "Done"
+    rows = client.get(f"/api/followups?job_id={jid}").json()
+    nxt = [r for r in rows if r["id"] != fu["id"]]
+    assert [(r["type"], r["due_date"], r["status"], r["note"], r["bucket"]) for r in nxt] == \
+           [("Recruiter outreach", "2026-11-19", "Open", "Ping about timing", "upcoming")]
+
+
+def test_done_with_a_past_next_date_changes_nothing(client):
+    client.app.state.today = lambda: date(2026, 11, 12)
+    jid = _job(client)
+    fu = client.post("/api/followups", json={"type": "Other", "due_date": "2026-11-12", "job_id": jid}).json()
+    r = client.post(f"/api/followups/{fu['id']}/done", json={"next_date": "2026-11-01"})
+    assert r.status_code == 400
+    rows = client.get(f"/api/followups?job_id={jid}").json()
+    assert [(x["id"], x["status"]) for x in rows] == [(fu["id"], "Open")]
+
+
 def test_errors(client):
     client.app.state.today = lambda: date(2026, 11, 12)
     jid = _job(client)
