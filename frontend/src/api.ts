@@ -938,3 +938,23 @@ export const createApiKey = (name: string, scope: 'read' | 'readwrite', expiresI
   })
 
 export const revokeApiKey = (id: number) => request<void>(`/keys/${id}`, { method: 'DELETE' })
+
+export interface OAuthClientInfo {
+  name: string
+  redirect_hosts: string[]
+}
+
+export interface OAuthApproval {
+  client_id: string
+  redirect_uri: string
+  state: string
+  code_challenge: string
+  scope: 'read' | 'readwrite'
+  approve: boolean
+}
+
+export const getOAuthClient = (clientId: string) =>
+  request<OAuthClientInfo>(`/oauth/clients/${encodeURIComponent(clientId)}`)
+
+export const approveOAuth = (body: OAuthApproval) =>
+  request<{ redirect_to: string }>('/oauth/approve', { method: 'POST', body: JSON.stringify(body) })

@@ -150,7 +150,7 @@ export default function ClaudeAccessSection() {
                   {k.via === 'sign-in' && (
                     <span className="muted">
                       {' '}
-                      · Connected via sign-in{k.app_name ? ` (${k.app_name})` : ''}
+                      Â· Connected via sign-in{k.app_name ? ` (${k.app_name})` : ''}
                     </span>
                   )}
                 </td>
