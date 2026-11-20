@@ -36,6 +36,14 @@ class Edge(Construct):
             authorizer=authorizer,
         )
 
+        # The one exception: Claude Desktop cannot sign in with Cognito, so it calls this route with an API key
+        # that the app itself checks (hashed, revocable, scoped, rate-limited). More specific than the route above.
+        self.api.add_routes(
+            path="/api/mcp",
+            methods=[apigw.HttpMethod.POST],
+            integration=integrations.HttpLambdaIntegration("McpIntegration", api_function),
+        )
+
         api_origin = origins.HttpOrigin(Fn.select(2, Fn.split("/", self.api.api_endpoint)))
         self.distribution = cloudfront.Distribution(
             self, "Distribution",
