@@ -33,6 +33,7 @@ from jobmecloud.api import (
     routes_sheet_import,
     routes_tracking,
     routes_keys,
+    routes_mcp,
     routes_watchlist,
 )
 from jobmecloud.agents.jobscout.pipeline import RunDeps
@@ -75,7 +76,9 @@ def create_app(
     if workspace is not None:
         app.add_middleware(WorkspaceSyncMiddleware, workspace=workspace)
     hosts = os.environ.get("JOBMECLOUD_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver")
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[h.strip() for h in hosts.split(",") if h.strip()])
+    allowed = [h.strip() for h in hosts.split(",") if h.strip()]
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed)
+    app.state.first_host = next((h for h in allowed if "*" not in h), "testserver")  # for in-process calls
     app.state.data_dir = data_dir
     app.state.engine = engine
     app.state.provider_builder = provider_builder
@@ -119,6 +122,7 @@ def create_app(
     app.include_router(routes_models.router, prefix="/api")
     app.include_router(routes_watchlist.router, prefix="/api")
     app.include_router(routes_keys.router, prefix="/api")
+    app.include_router(routes_mcp.router, prefix="/api")
     app.include_router(routes_import.router, prefix="/api")
     app.include_router(routes_runs.router, prefix="/api")
     app.include_router(routes_inbound.router, prefix="/api")
