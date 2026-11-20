@@ -9,7 +9,8 @@ from jobmecloud.db.models import Job
 
 RESUME_NAMES = ("resume.docx", "resume.pdf", "resume.txt", "resume.md")
 COVER_NAME = "cover-letter.docx"
-ARCHIVED = (*RESUME_NAMES, COVER_NAME, "notes.md")
+COVER_NAMES = (COVER_NAME, "cover-letter.pdf", "cover-letter.md")
+ARCHIVED = (*RESUME_NAMES, *COVER_NAMES, "notes.md")
 
 _ILLEGAL = re.compile(r'[<>:"/\\|?*]')
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")

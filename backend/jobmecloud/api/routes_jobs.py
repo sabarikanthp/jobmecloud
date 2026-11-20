@@ -13,7 +13,7 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session
 
 from jobmecloud.applydocs.make_docs import NO_SUCH_RESUME_COPY, DocsSetupError, use_as_is
-from jobmecloud.applydocs.output import COVER_NAME, RESUME_NAMES, FileInUseError, document_filename
+from jobmecloud.applydocs.output import COVER_NAMES, RESUME_NAMES, FileInUseError, document_filename
 from jobmecloud.resumes.store import load_index
 from jobmecloud.applydocs.service import generate_with_lock
 from jobmecloud.config.profile import load_user
@@ -201,7 +201,7 @@ def _target(state, job_id: int, what: str) -> Path:
         raise HTTPException(404, NO_DOCS_COPY)
     if what == "folder":
         return folder
-    names = RESUME_NAMES if what == "resume" else (COVER_NAME,)
+    names = RESUME_NAMES if what == "resume" else COVER_NAMES
     for name in names:
         if (folder / name).is_file():
             return folder / name

@@ -67,3 +67,13 @@ def test_download_is_unavailable_without_a_workspace(client):
     job_id = make_docs_folder(client)
     r = client.post(f"/api/jobs/{job_id}/download", json={"what": "resume"})
     assert r.status_code == 400
+
+
+@pytest.mark.parametrize("name", ["cover-letter.md", "cover-letter.pdf"])
+def test_download_cover_letter_md_and_pdf_found(cloud_client, name):
+    job_id = make_docs_folder(cloud_client)
+    with Session(cloud_client.app.state.engine) as s:
+        folder = load_settings(cloud_client.app.state.data_dir).applications_path(cloud_client.app.state.data_dir) / "Acme"
+    (folder / name).write_bytes(b"letter")
+    r = cloud_client.post(f"/api/jobs/{job_id}/download", json={"what": "cover_letter"})
+    assert r.status_code == 200 and r.json()["filename"].endswith(name.rsplit(".", 1)[1])
