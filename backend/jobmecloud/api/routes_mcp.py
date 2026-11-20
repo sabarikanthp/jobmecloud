@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request, Response
 from sqlmodel import Session
 
 from jobmecloud.keys import store
-from jobmecloud.mcp import protocol
+from jobmecloud.mcp import protocol, tools_read  # noqa: F401  (importing the tool modules registers the tools)
 
 router = APIRouter()
 
