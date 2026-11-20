@@ -95,6 +95,9 @@ class JobMeCloudStack(Stack):
                 "JOBMECLOUD_RUN_FUNCTION_ARN": self.run_worker.function_arn,
                 "JOBMECLOUD_SCHEDULER_ROLE_ARN": self.scheduler_role.role_arn,
                 "JOBMECLOUD_TIMEZONE": timezone,
+                # The OAuth issuer for ChatGPT / Claude connectors. Only known up front with your own hostname: the
+                # CloudFront address cannot be passed in without the stack depending on itself.
+                **({"JOBMECLOUD_SITE_URL": f"https://{site_domain}"} if site_domain else {}),
             },
         )
         self.run_worker.grant_invoke(self.api_function)
