@@ -90,6 +90,10 @@ See [email-ingest.md](email-ingest.md) for how it works. Start with `uv run pyth
 
 **The email is `failed`.** The note says why (for example the report could not be read, or no AI connection is set up). Fix it and replay it.
 
+## Claude Desktop
+
+**Claude Desktop shows no JobMe tools, a 401, or "This key is read-only".** See the troubleshooting section of [claude-desktop.md](claude-desktop.md).
+
 ## Still stuck
 
 Open an issue (without personal data or keys) with what you did, what you expected and what you saw, plus the relevant lines from the CloudWatch log group.
