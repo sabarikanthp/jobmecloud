@@ -9,10 +9,12 @@ import json
 import time
 from collections import deque
 from datetime import datetime, timezone
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from typing import Literal
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from jobmecloud.oauth import store
@@ -135,3 +137,72 @@ def authorize(request: Request) -> Response:
     if q.get("scope"):
         params["scope"] = q["scope"][:100]
     return Response(status_code=302, headers={"Location": f"{site}/#/connect?{urlencode(params)}"})
+
+
+class ApproveIn(BaseModel):
+    client_id: str
+    redirect_uri: str
+    state: str | None = None
+    code_challenge: str
+    scope: Literal["read", "readwrite"]
+    approve: bool
+
+
+@router.get("/oauth/clients/{client_id}")
+def client_info(client_id: str, request: Request) -> Response:
+    """What the consent page shows about the app asking. Owner-only (behind the normal sign-in)."""
+    with Session(request.app.state.engine) as session:
+        client = store.get_client(session, client_id)
+        if client is None:
+            return _error("invalid_client", "No such app.", 404)
+        return JSONResponse({"name": client.name,
+                             "redirect_hosts": sorted({urlsplit(u).hostname or "" for u in client.redirect_uris})})
+
+
+@router.post("/oauth/approve")
+def approve(body: ApproveIn, request: Request) -> Response:
+    """The owner's answer on the consent page. Owner-only (behind the normal sign-in); returns where to send the browser."""
+    now = datetime.now(timezone.utc)
+    with Session(request.app.state.engine) as session:
+        client = store.get_client(session, body.client_id)
+        if client is None or not store.check_redirect(client, body.redirect_uri):
+            return _error("invalid_request", "That connection request is not valid.")
+        if not 43 <= len(body.code_challenge) <= 128:
+            return _error("invalid_request", "That connection request is not valid.")
+        if not body.approve:
+            return JSONResponse({"redirect_to": _with_query(body.redirect_uri, error="access_denied", state=body.state)})
+        code = store.issue_code(session, client=client, redirect_uri=body.redirect_uri,
+                                code_challenge=body.code_challenge, scope=body.scope, now=now)
+    return JSONResponse({"redirect_to": _with_query(body.redirect_uri, code=code, state=body.state)})
+
+
+@router.post("/oauth/token")
+async def token(request: Request) -> Response:
+    try:
+        form = {k: v[0] for k, v in parse_qs((await request.body()).decode("utf-8")).items()}
+    except (UnicodeDecodeError, ValueError):
+        return _error("invalid_request", "The request could not be read.")
+    grant = form.get("grant_type")
+    if not grant:
+        return _error("invalid_request", "grant_type is required.")
+    if grant == "authorization_code":
+        needed = ("client_id", "code", "redirect_uri", "code_verifier")
+    elif grant == "refresh_token":
+        needed = ("client_id", "refresh_token")
+    else:
+        return _error("unsupported_grant_type", "Use authorization_code or refresh_token.")
+    if not all(form.get(k) for k in needed):
+        return _error("invalid_request", "Missing: " + ", ".join(k for k in needed if not form.get(k)))
+    now = datetime.now(timezone.utc)
+    try:
+        with Session(request.app.state.engine) as session:
+            if grant == "authorization_code":
+                tokens = store.exchange_code(session, client_id=form["client_id"], code=form["code"],
+                                             redirect_uri=form["redirect_uri"], verifier=form["code_verifier"], now=now)
+            else:
+                tokens = store.refresh(session, client_id=form["client_id"], refresh_token=form["refresh_token"], now=now)
+    except store.OAuthError as e:
+        return _error(e.code, e.description)
+    return JSONResponse({"access_token": tokens.access_token, "token_type": "Bearer", "expires_in": tokens.expires_in,
+                         "refresh_token": tokens.refresh_token, "scope": tokens.scope},
+                        headers={"Cache-Control": "no-store"})
