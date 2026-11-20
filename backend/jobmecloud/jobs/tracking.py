@@ -10,6 +10,7 @@ from typing import Literal
 from sqlmodel import Session
 
 from jobmecloud.db.models import ActivityLog, Job
+from jobmecloud.jobs.actor import resolve
 
 OPEN = ("New", "Ready", "Applied", "Interviewing", "Offer")
 USER_STATUSES = ("Applied", "Interviewing", "Offer", "Accepted", "Rejected", "Withdrawn", "Skipped", "Unavailable", "Duplicate")
@@ -83,7 +84,7 @@ def log(session: Session, *, entity_type: str, entity_id: int, job_id: int | Non
         at: datetime, actor: str = "user", from_value: str | None = None,
         to_value: str | None = None, note: str | None = None) -> ActivityLog:
     row = ActivityLog(entity_type=entity_type, entity_id=entity_id, job_id=job_id, action=action,
-                      from_value=from_value, to_value=to_value, at=at, actor=actor, note=note)
+                      from_value=from_value, to_value=to_value, at=at, actor=resolve(actor), note=note)
     session.add(row)
     session.flush()
     return row
