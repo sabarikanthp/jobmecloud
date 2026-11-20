@@ -3,6 +3,8 @@ import { fmtDate, followUpAction, type FollowUpAction, type FollowUpRow } from '
 import { daysFromTodayISO, todayISO, tomorrowISO } from '../dates.ts'
 import { useNav } from '../nav.tsx'
 import { errorText } from '../pages/jobFormat.ts'
+import { followUpRef } from '../claudeRef.ts'
+import CopyForClaude from './CopyForClaude.tsx'
 
 const FORMS: Record<string, string> = { done: 'Done', snooze: 'Snooze', reschedule: 'Reschedule' }
 
@@ -70,6 +72,7 @@ function Row({ row, onChanged, compact }: { row: FollowUpRow; onChanged: () => v
       </div>
       {row.note && <div className="help">{row.note}</div>}
       <div className="row">
+        <CopyForClaude text={followUpRef(row)} />
         <button type="button" className="add" disabled={busy} onClick={() => begin('done')}>
           Done
         </button>

@@ -13,6 +13,8 @@ import { useNav } from '../nav.tsx'
 import { ContactForm } from './JobContacts.tsx'
 import { AddFollowUpForm } from './JobFollowUps.tsx'
 import { errorText } from './jobFormat.ts'
+import CopyForClaude from '../components/CopyForClaude.tsx'
+import { contactRef } from '../claudeRef.ts'
 
 function ContactCard({
   contact,
@@ -96,6 +98,7 @@ function ContactCard({
         {contact.open_followups} open follow-up{contact.open_followups === 1 ? '' : 's'}
       </div>
       <div className="row">
+        <CopyForClaude text={contactRef(contact)} />
         <button type="button" disabled={busy} onClick={() => setMode(mode === 'followup' ? 'view' : 'followup')}>
           Add follow-up
         </button>

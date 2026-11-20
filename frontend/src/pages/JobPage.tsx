@@ -14,6 +14,8 @@ import { KeyDates, Notes, Timeline } from './JobSections.tsx'
 import { Chips } from './JobParts.tsx'
 import { errorText, formatPay, matchText } from './jobFormat.ts'
 import { useDocsRunner } from './useDocsRunner.ts'
+import CopyForClaude from '../components/CopyForClaude.tsx'
+import { jobRef } from '../claudeRef.ts'
 
 export default function JobPage({ id }: { id: number }) {
   const { go } = useNav()
@@ -91,6 +93,9 @@ export default function JobPage({ id }: { id: number }) {
           )}
         </p>
         <p>{[formatPay(job.pay_min, job.pay_max), where].filter(Boolean).join(' · ')}</p>
+        <p>
+          <CopyForClaude text={jobRef(job)} />
+        </p>
         {(job.apply_url || job.linkedin) && (
           <p>
             {job.apply_url && (
