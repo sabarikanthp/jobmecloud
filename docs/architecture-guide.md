@@ -181,6 +181,10 @@ workspace/logs/...           one transcript per run
 workspace/applications/...   generated documents, one folder per job
 ```
 
+### Claude Desktop access
+
+A second front door for Claude Desktop. `POST /api/mcp` (`api/routes_mcp.py`) speaks stateless MCP (JSON-RPC) and is the only API Gateway route without the JWT authorizer. It checks a bearer key (`keys/store.py`: random, hashed, scoped `read` or `readwrite`, revocable, with a per-minute and a daily AI-spend limit) and then runs a tool from `mcp/`. Each tool calls one of the app's own routes in-process (`mcp/registry.py`, a `TestClient`), so validation, history and S3 sync match the website; a context variable (`jobs/actor.py`) records the change as "claude:key name". The one tool that writes files, `attach_documents` (`applydocs/attach.py`), puts a chat-written resume or cover letter into the job's folder. Keys are made in Settings (`api/routes_keys.py`, `sections/ClaudeAccessSection.tsx`). See [claude-desktop.md](claude-desktop.md).
+
 ## 7. The database layer
 
 The same models run on SQLite (laptop and most tests) and on Aurora DSQL. `make_engine()` picks by URL: `dsql://<endpoint>` for the cloud. DSQL is PostgreSQL-compatible but not PostgreSQL, so these rules shaped the code:

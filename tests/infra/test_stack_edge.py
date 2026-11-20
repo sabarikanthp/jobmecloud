@@ -12,10 +12,15 @@ def only(template, type_):
 def test_api_routes_require_authorizer(template):
     routes = template.find_resources("AWS::ApiGatewayV2::Route")
     assert routes, "the API has no routes"
+    open_routes = []
     for route in routes.values():
         props = route["Properties"]
-        assert props["AuthorizationType"] == "JWT" and "AuthorizerId" in props
-        assert props["RouteKey"].endswith("/api/{proxy+}")
+        if props["AuthorizationType"] == "JWT":
+            assert "AuthorizerId" in props and props["RouteKey"].endswith("/api/{proxy+}")
+        else:
+            open_routes.append((props["AuthorizationType"], props["RouteKey"]))
+    # The one exception: Claude Desktop calls /api/mcp with an API key the app checks itself.
+    assert open_routes == [("NONE", "POST /api/mcp")]
 
 
 def test_authorizer_checks_the_user_pool_and_client(template):

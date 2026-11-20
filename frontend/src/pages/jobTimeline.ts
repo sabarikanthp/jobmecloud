@@ -72,7 +72,9 @@ export function describe(e: TimelineEntry): string {
         ? `Follow-up ${FOLLOWUP[e.action]}`
         : e.action.replace(/_/g, ' ')
   }
-  return e.actor === 'system' ? `${text} (automatic)` : text
+  if (e.actor === 'system') return `${text} (automatic)`
+  if (e.actor.startsWith('claude:')) return `${text} (by Claude: ${e.actor.slice(7)})`
+  return text
 }
 
 // Entries whose note is shown beside the sentence.

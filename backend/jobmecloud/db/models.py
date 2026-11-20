@@ -162,3 +162,19 @@ class InboundEmail(SQLModel, table=True):
     run_id: int | None = fk("run.id", optional=True)
     note: str | None = None
     claimed_at: datetime | None = None  # when an invocation took it; a stale claim (a crash) can be taken over
+
+
+class ApiKey(SQLModel, table=True):
+    """A key that lets Claude Desktop reach the app. Only a hash of the key is kept."""
+
+    id: int | None = pk_column()
+    name: str = Field(sa_column_kwargs={"nullable": True})
+    prefix: str = Field(sa_column_kwargs={"nullable": True})
+    key_hash: str = Field(sa_column_kwargs={"nullable": True, "unique": True})
+    scope: str = Field(sa_column_kwargs={"nullable": True})  # read / readwrite
+    created_at: datetime = Field(sa_column_kwargs={"nullable": True})
+    expires_at: datetime | None = None
+    last_used_at: datetime | None = None
+    revoked_at: datetime | None = None
+    ai_day: date | None = None  # the day ai_count counts, for the daily cap on AI-cost tools
+    ai_count: int = Field(default=0, sa_column_kwargs={"nullable": True})

@@ -911,3 +911,28 @@ export const scheduleOn = (body: { days: string[]; times: string[] }) =>
   request<{ enabled: boolean }>('/schedule/on', post(body))
 
 export const scheduleOff = () => request<{ enabled: boolean }>('/schedule/off', post({}))
+
+export interface ApiKeyOut {
+  id: number
+  name: string
+  prefix: string
+  scope: 'read' | 'readwrite'
+  created_at: string
+  expires_at: string | null
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
+export interface ApiKeyCreated extends ApiKeyOut {
+  key: string // shown once, when the key is created
+}
+
+export const listApiKeys = () => request<ApiKeyOut[]>('/keys')
+
+export const createApiKey = (name: string, scope: 'read' | 'readwrite', expiresInDays: number | null) =>
+  request<ApiKeyCreated>('/keys', {
+    method: 'POST',
+    body: JSON.stringify({ name, scope, expires_in_days: expiresInDays }),
+  })
+
+export const revokeApiKey = (id: number) => request<void>(`/keys/${id}`, { method: 'DELETE' })

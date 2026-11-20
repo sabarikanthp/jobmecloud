@@ -18,6 +18,7 @@ from jobmecloud.applydocs.content import Draft, original_content
 from jobmecloud.applydocs.links import contact_index, feedback_links, new_links
 from jobmecloud.applydocs.output import (
     COVER_NAME,
+    COVER_NAMES,
     archive_previous,
     job_folder_name,
     prepare_folder,
@@ -137,8 +138,9 @@ def use_as_is(data_dir: Path, engine: Engine, job_id: int, resume_id: str, now: 
     today = now.astimezone().date()
 
     folder, archived = _open_folder(data_dir, load_settings(data_dir), job, today, now)
-    if archived is not None and (archived / COVER_NAME).is_file():
-        shutil.copy2(archived / COVER_NAME, folder / COVER_NAME)  # the cover letter stays in use
+    for cover in COVER_NAMES:
+        if archived is not None and (archived / cover).is_file():
+            shutil.copy2(archived / cover, folder / cover)  # the cover letter stays in use
     shutil.copyfile(source, folder / f"resume{Path(entry.filename).suffix}")
     write_job_md(folder, job)
     write_notes_md(folder, job, changes=[], check_notes=[], page_note="", resume_name=entry.name, as_is=True)

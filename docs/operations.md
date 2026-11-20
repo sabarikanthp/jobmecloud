@@ -12,7 +12,7 @@ uv run python scripts/migrate_db.py
 uv run python scripts/publish_site.py
 ```
 
-Always rebuild and redeploy after changing backend code: the old functions keep running until you do. Use the same `-c` values you deployed with, including the optional ones if you set them (`site_domain`, `certificate_arn`, `inbound_address`, `inbound_sender`, `inbound_daily_limit`). Leaving one out on a later deploy removes that feature. `cdk deploy` shows a summary of what will change and asks before applying it; read it. `migrate_db.py` is safe to repeat: it only adds what is missing. The release notes say if anything needs more than this.
+Always rebuild and redeploy after changing backend code: the old functions keep running until you do. Use the same `-c` values you deployed with, including the optional ones if you set them (`site_domain`, `certificate_arn`, `inbound_address`, `inbound_sender`, `inbound_daily_limit`). Leaving one out on a later deploy removes that feature. `cdk deploy` shows a summary of what will change and asks before applying it; read it. `migrate_db.py` is safe to repeat: it only adds what is missing. The release notes say if anything needs more than this. The Claude Desktop feature ([claude-desktop.md](claude-desktop.md)) adds a database table and an API route, so an update that includes it needs every step above, including `migrate_db.py`.
 
 ## Backups
 
