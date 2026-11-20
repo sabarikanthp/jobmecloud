@@ -921,6 +921,8 @@ export interface ApiKeyOut {
   expires_at: string | null
   last_used_at: string | null
   revoked_at: string | null
+  via: 'key' | 'sign-in' // sign-in: a connector (ChatGPT, Claude) the owner approved
+  app_name: string | null
 }
 
 export interface ApiKeyCreated extends ApiKeyOut {

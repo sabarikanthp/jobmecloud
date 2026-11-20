@@ -7,7 +7,9 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlmodel import Session
 
-from jobmecloud.db.models import ApiKey
+from sqlmodel import select
+
+from jobmecloud.db.models import ApiKey, OAuthClient, OAuthGrant
 from jobmecloud.keys import store
 
 router = APIRouter()
@@ -36,21 +38,27 @@ class KeyOut(BaseModel):
     expires_at: datetime | None
     last_used_at: datetime | None
     revoked_at: datetime | None
+    via: Literal["key", "sign-in"] = "key"  # sign-in: made by approving a connector (ChatGPT, Claude) rather than by a key
+    app_name: str | None = None
 
 
 class KeyCreated(KeyOut):
     key: str  # shown once, here only
 
 
-def _out(row: ApiKey) -> dict:
+def _out(row: ApiKey, app_name: str | None = None, via: str = "key") -> dict:
     return KeyOut(id=row.id, name=row.name, prefix=row.prefix, scope=row.scope, created_at=row.created_at,
-                  expires_at=row.expires_at, last_used_at=row.last_used_at, revoked_at=row.revoked_at).model_dump()
+                  expires_at=row.expires_at, last_used_at=row.last_used_at, revoked_at=row.revoked_at,
+                  via=via, app_name=app_name).model_dump()
 
 
 @router.get("/keys")
 def list_keys(request: Request) -> list[KeyOut]:
     with Session(request.app.state.engine) as session:
-        return [KeyOut(**_out(r)) for r in store.list_keys(session)]
+        app_by_key = {g.api_key_id: g.client_id for g in session.exec(select(OAuthGrant))}
+        names = {c.client_id: c.name for c in session.exec(select(OAuthClient))}
+        return [KeyOut(**_out(r, names.get(app_by_key.get(r.id)), "sign-in" if r.id in app_by_key else "key"))
+                for r in store.list_keys(session)]
 
 
 @router.post("/keys", status_code=201)
