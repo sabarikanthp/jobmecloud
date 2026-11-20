@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, Response
 from sqlmodel import Session
 
 from jobmecloud.keys import store
+from jobmecloud.oauth import store as oauth
 from jobmecloud.mcp import protocol, tools_docs, tools_read, tools_write  # noqa: F401  (importing the tool modules registers the tools)
 
 router = APIRouter()
@@ -27,6 +28,14 @@ def _bearer(request: Request) -> str | None:
     if len(parts) == 2 and parts[0].lower() == "bearer":
         return parts[1]
     return None
+
+
+def _unauthorized(presented: str | None) -> Response:
+    """401, with a pointer to the sign-in metadata so a connector can start (or restart) signing in."""
+    try:
+        return Response(status_code=401, headers={"WWW-Authenticate": oauth.www_authenticate(invalid_token=bool(presented))})
+    except oauth.OAuthError:  # no site address configured: a bare 401, as for keys
+        return Response(status_code=401)
 
 
 def _too_fast(key_id: int) -> bool:
@@ -53,8 +62,10 @@ def mcp(message: dict, request: Request) -> Response:
     presented = _bearer(request)
     with Session(state.engine) as session:
         key = store.verify_key(session, presented, now) if presented else None
+        if key is not None and presented.startswith(oauth.OAUTH_PREFIX) and not oauth.access_valid(session, key, now):
+            key = None
         if key is None:
-            return Response(status_code=401)
+            return _unauthorized(presented)
         if _too_fast(key.id):
             return Response(status_code=429, headers={"Retry-After": "60"})
         store.touch(session, key, now)

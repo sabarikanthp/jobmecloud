@@ -7,6 +7,7 @@ plus an OAuthGrant row with the 1-hour access expiry and the rotating refresh to
 import base64
 import hashlib
 import hmac
+import os
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -161,3 +162,20 @@ def refresh(session: Session, *, client_id: str, refresh_token: str, now: dateti
 def access_valid(session: Session, key: ApiKey, now: datetime) -> bool:
     grant = session.exec(select(OAuthGrant).where(OAuthGrant.api_key_id == key.id)).first()
     return grant is not None and as_utc(grant.access_expires_at) > now
+
+
+def site_url() -> str:
+    """The public address of the site: the OAuth issuer. Set at deploy time, never read from request headers."""
+    url = os.environ.get("JOBMECLOUD_SITE_URL", "").strip().rstrip("/")
+    if not url:
+        raise OAuthError("invalid_request", "Sign-in for connectors needs your own site address (site_domain) at deploy time.")
+    return url
+
+
+def www_authenticate(*, invalid_token: bool) -> str:
+    """The WWW-Authenticate value that tells a connector where to find the sign-in metadata."""
+    parts = []
+    if invalid_token:
+        parts.append('error="invalid_token"')
+    parts.append(f'resource_metadata="{site_url()}/.well-known/oauth-protected-resource/api/mcp"')
+    return "Bearer " + ", ".join(parts)
