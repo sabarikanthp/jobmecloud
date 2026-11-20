@@ -178,3 +178,38 @@ class ApiKey(SQLModel, table=True):
     revoked_at: datetime | None = None
     ai_day: date | None = None  # the day ai_count counts, for the daily cap on AI-cost tools
     ai_count: int = Field(default=0, sa_column_kwargs={"nullable": True})
+
+
+class OAuthClient(SQLModel, table=True):
+    """An app (ChatGPT, Claude) that registered itself to ask the owner for access. It gets nothing until approved."""
+
+    id: int | None = pk_column()
+    client_id: str = Field(sa_column_kwargs={"nullable": True, "unique": True})
+    name: str = Field(sa_column_kwargs={"nullable": True})
+    redirect_uris: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    created_at: datetime = Field(sa_column_kwargs={"nullable": True})
+
+
+class OAuthCode(SQLModel, table=True):
+    """A one-time code the owner's approval produced, to be swapped for tokens. Only a hash is kept."""
+
+    id: int | None = pk_column()
+    code_hash: str = Field(sa_column_kwargs={"nullable": True, "unique": True})
+    client_id: str = Field(sa_column_kwargs={"nullable": True})
+    redirect_uri: str = Field(sa_column_kwargs={"nullable": True})
+    code_challenge: str = Field(sa_column_kwargs={"nullable": True})
+    scope: str = Field(sa_column_kwargs={"nullable": True})  # read / readwrite
+    expires_at: datetime = Field(sa_column_kwargs={"nullable": True})
+    used_at: datetime | None = None
+    api_key_id: int | None = None  # the connection this code created, so reusing the code can revoke it
+
+
+class OAuthGrant(SQLModel, table=True):
+    """The sign-in side of one connection (its ApiKey row): short-lived access, rotating refresh token."""
+
+    id: int | None = pk_column()
+    api_key_id: int = Field(sa_column_kwargs={"nullable": True, "unique": True})
+    client_id: str = Field(sa_column_kwargs={"nullable": True})
+    access_expires_at: datetime = Field(sa_column_kwargs={"nullable": True})
+    refresh_hash: str = Field(sa_column_kwargs={"nullable": True, "unique": True})
+    refresh_expires_at: datetime = Field(sa_column_kwargs={"nullable": True})

@@ -22,6 +22,10 @@ def _utc(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
+hash_token = _hash  # shared with the OAuth sign-in, which stores its tokens the same way
+as_utc = _utc
+
+
 def create_key(session: Session, *, name: str, scope: str, expires_at: datetime | None,
                now: datetime) -> tuple[ApiKey, str]:
     if scope not in SCOPES:
