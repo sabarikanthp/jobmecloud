@@ -9,6 +9,7 @@ import LimitsSection from '../sections/LimitsSection.tsx'
 import DocumentsSection from '../sections/DocumentsSection.tsx'
 import TrackingSection from '../sections/TrackingSection.tsx'
 import JobFieldsSection from '../sections/JobFieldsSection.tsx'
+import ClaudeAccessSection from '../sections/ClaudeAccessSection.tsx'
 
 // Sections are listed in wizard order.
 export default function Settings() {
@@ -26,6 +27,7 @@ export default function Settings() {
       <DocumentsSection mode="settings" />
       <TrackingSection mode="settings" />
       <JobFieldsSection />
+      <ClaudeAccessSection />
     </section>
   )
 }
