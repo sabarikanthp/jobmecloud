@@ -55,3 +55,13 @@ def test_cloudfront_sends_well_known_to_the_api(template):
 def test_site_url_is_set_with_a_custom_domain_and_absent_without(template, custom):
     assert api_function_env(custom)["JOBMECLOUD_SITE_URL"] == f"https://{DOMAIN}"
     assert "JOBMECLOUD_SITE_URL" not in api_function_env(template)
+
+
+def test_the_site_cannot_be_framed(template):
+    """The consent page must refuse to be shown inside another site's frame."""
+    dist = list(template.find_resources("AWS::CloudFront::Distribution").values())[0]["Properties"]["DistributionConfig"]
+    policy_id = dist["DefaultCacheBehavior"]["ResponseHeadersPolicyId"]
+    policies = template.find_resources("AWS::CloudFront::ResponseHeadersPolicy")
+    config = next(iter(policies.values()))["Properties"]["ResponseHeadersPolicyConfig"]
+    assert policy_id["Ref"] in policies
+    assert config["SecurityHeadersConfig"]["FrameOptions"] == {"FrameOption": "DENY", "Override": True}

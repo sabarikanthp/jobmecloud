@@ -118,3 +118,23 @@ def test_unconfigured_site_url_is_a_clear_503(client, monkeypatch):
     for path in ("/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource"):
         r = client.get(path)
         assert r.status_code == 503 and "site_domain" in r.json()["error_description"]
+
+
+def test_register_hostile_input_is_400_not_500(client):
+    bodies = [
+        rb'{"client_name": "a\u0000b", "redirect_uris": ["https://x.com/cb"]}',
+        rb'{"redirect_uris": ["https://x.com/\u0000"]}',
+        ("[" * 100000).encode(),  # nesting deep enough to overflow a recursive parser
+        b'{"redirect_uris": ["https://x.com/cb"], "pad": "' + b"a" * 100000 + b'"}',  # far too large
+        ('{"redirect_uris": [' + ",".join(f'"https://x.com/{i}"' for i in range(500)) + "]}").encode(),
+    ]
+    for body in bodies:
+        r = client.post("/api/oauth/register", content=body, headers={"Content-Type": "application/json"})
+        assert r.status_code == 400, body[:40]
+        assert r.json()["error"] == "invalid_client_metadata"
+
+
+def test_authorize_and_lookup_with_nul_in_client_id_are_clean_errors(client):
+    r = authorize(client, "abc\x00def")
+    assert r.status_code == 400
+    assert client.get("/api/oauth/clients/abc%00def").status_code == 404

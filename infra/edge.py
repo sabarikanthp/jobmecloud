@@ -61,6 +61,14 @@ class Edge(Construct):
             default_behavior=cloudfront.BehaviorOptions(
                 origin=origins.S3BucketOrigin.with_origin_access_control(site_bucket),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                # The page where you approve a connector must never be shown inside another site's frame.
+                response_headers_policy=cloudfront.ResponseHeadersPolicy(
+                    self, "SiteHeaders",
+                    security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
+                        frame_options=cloudfront.ResponseHeadersFrameOptions(
+                            frame_option=cloudfront.HeadersFrameOption.DENY, override=True),
+                    ),
+                ),
             ),
             additional_behaviors={
                 "/api/*": cloudfront.BehaviorOptions(

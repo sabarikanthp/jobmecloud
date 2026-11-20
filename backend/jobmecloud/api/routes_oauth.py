@@ -24,6 +24,7 @@ router = APIRouter()  # mounted under /api
 
 SCOPES = ["read", "readwrite"]
 REGISTER_PER_MINUTE = 10
+MAX_REGISTER_BODY = 20_000  # bytes; a real registration is a few hundred
 _registrations: deque = deque()
 
 
@@ -86,9 +87,10 @@ async def register(request: Request) -> Response:
     if _too_many_registrations():
         return JSONResponse({"error": "temporarily_unavailable", "error_description": "Too many registrations."},
                             status_code=429, headers={"Retry-After": "60"})
+    raw = await request.body()
     try:
-        body = json.loads(await request.body() or b"null")
-    except ValueError:
+        body = json.loads(raw or b"null") if len(raw) <= MAX_REGISTER_BODY else None
+    except (ValueError, RecursionError):  # not JSON, or nested deeply enough to overflow the parser
         body = None
     if not isinstance(body, dict):
         return _error("invalid_client_metadata", "Send a JSON object with redirect_uris.")

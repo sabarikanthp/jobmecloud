@@ -136,3 +136,30 @@ def test_refresh_refused_after_revoke_expiry_or_for_another_client(session):
     with pytest.raises(oauth.OAuthError) as e:
         oauth.refresh(session, client_id=client.client_id, refresh_token=tokens.refresh_token, now=NOW)
     assert e.value.code == "invalid_grant"
+
+
+def test_register_rejects_nul_bytes_and_too_many_uris(session):
+    for kwargs in (dict(name="a\x00b", redirect_uris=[REDIRECT]), dict(name="ok", redirect_uris=["https://x.com/\x00"]),
+                   dict(name="ok", redirect_uris=[f"https://x.com/{i}" for i in range(11)])):
+        with pytest.raises(oauth.OAuthError) as e:
+            oauth.register_client(session, now=NOW, **kwargs)
+        assert e.value.code == "invalid_client_metadata"
+
+
+def test_get_client_with_nul_byte_is_none_not_a_database_error(session):
+    assert oauth.get_client(session, "abc\x00def") is None
+
+
+def test_the_cap_counts_live_connections_not_every_one_ever_made(session):
+    clients = []
+    for i in range(oauth.MAX_CLIENTS):
+        client = make_client(session, name=f"c{i}")
+        code = oauth.issue_code(session, client=client, redirect_uri=REDIRECT, code_challenge=CHALLENGE, scope="read", now=NOW)
+        oauth.exchange_code(session, client_id=client.client_id, code=code, redirect_uri=REDIRECT, verifier=VERIFIER, now=NOW)
+        clients.append(client)
+    later = NOW + timedelta(days=2)
+    with pytest.raises(oauth.OAuthError):  # 50 live connections: full
+        make_client(session, now=later, name="one too many")
+    for key in session.exec(select(ApiKey)).all():
+        keys.revoke_key(session, key.id, later)
+    assert make_client(session, now=later, name="after revoking").client_id  # revoked ones no longer count

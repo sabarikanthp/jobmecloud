@@ -25,6 +25,7 @@ CODE_LIFE = timedelta(minutes=5)
 ACCESS_LIFE = timedelta(hours=1)
 CONNECTION_LIFE = timedelta(days=30)  # the refresh token and the connection's ApiKey both last this long
 MAX_URI_CHARS = 2000
+MAX_REDIRECT_URIS = 10
 LOCAL_HOSTS = ("localhost", "127.0.0.1")
 
 
@@ -45,7 +46,7 @@ class Tokens:
 
 
 def _valid_redirect(uri: object) -> bool:
-    if not isinstance(uri, str) or not uri or len(uri) > MAX_URI_CHARS:
+    if not isinstance(uri, str) or not uri or len(uri) > MAX_URI_CHARS or "\x00" in uri:
         return False
     try:
         parts = urlparse(uri)
@@ -68,11 +69,34 @@ def _prune(session: Session, now: datetime) -> None:
     session.flush()
 
 
+def _live_count(session: Session, now: datetime) -> int:
+    """Apps that count against the cap: those with a working connection, and those still waiting for approval.
+    A connection that was revoked or has run out is over and does not count, so the cap never locks the owner out."""
+    keys_by_client: dict[str, list[int]] = {}
+    for grant in session.exec(select(OAuthGrant)):
+        keys_by_client.setdefault(grant.client_id, []).append(grant.api_key_id)
+    keys = {k.id: k for k in session.exec(select(ApiKey))}
+
+    def working(key_id: int) -> bool:
+        key = keys.get(key_id)
+        return key is not None and key.revoked_at is None and (key.expires_at is None or as_utc(key.expires_at) > now)
+
+    live = 0
+    for client in session.exec(select(OAuthClient)):
+        ids = keys_by_client.get(client.client_id)
+        if ids is None or any(working(i) for i in ids):
+            live += 1
+    return live
+
+
 def register_client(session: Session, *, name: str, redirect_uris: list[str], now: datetime) -> OAuthClient:
-    if not isinstance(redirect_uris, list) or not redirect_uris or not all(_valid_redirect(u) for u in redirect_uris):
-        raise OAuthError("invalid_client_metadata", "redirect_uris must be https addresses (http only for localhost).")
+    if (not isinstance(redirect_uris, list) or not redirect_uris or len(redirect_uris) > MAX_REDIRECT_URIS
+            or not all(_valid_redirect(u) for u in redirect_uris)):
+        raise OAuthError("invalid_client_metadata", "redirect_uris must be up to 10 https addresses (http only for localhost).")
+    if "\x00" in str(name or ""):
+        raise OAuthError("invalid_client_metadata", "client_name is not valid.")
     _prune(session, now)
-    if len(session.exec(select(OAuthClient)).all()) >= MAX_CLIENTS:
+    if _live_count(session, now) >= MAX_CLIENTS:
         raise OAuthError("invalid_client_metadata", "Too many apps are waiting for approval. Try again later.")
     label = (str(name or "").strip() or "Connected app")[:60]
     client = OAuthClient(client_id="jmc-" + secrets.token_urlsafe(16), name=label,
@@ -84,6 +108,8 @@ def register_client(session: Session, *, name: str, redirect_uris: list[str], no
 
 
 def get_client(session: Session, client_id: str) -> OAuthClient | None:
+    if "\x00" in client_id:  # the database cannot hold a NUL byte; no client id has one
+        return None
     return session.exec(select(OAuthClient).where(OAuthClient.client_id == client_id)).first()
 
 
