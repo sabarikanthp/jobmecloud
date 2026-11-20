@@ -30,3 +30,9 @@ def ok(result):
 def failed(result) -> str:
     assert result["isError"] is True, result["content"][0]["text"]
     return result["content"][0]["text"]
+
+
+def plain(text):
+    """A wrapped outside-text field without its <untrusted_data> wrapper."""
+    start, end = "<untrusted_data>" + chr(10), chr(10) + "</untrusted_data>"
+    return text[len(start):-len(end)] if isinstance(text, str) and text.startswith(start) else text

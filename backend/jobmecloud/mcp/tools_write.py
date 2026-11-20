@@ -2,7 +2,7 @@
 activity history and the follow-up rules are exactly what the website gets. Nothing here deletes anything."""
 
 from jobmecloud.mcp.registry import ToolContext, ToolError, tool
-from jobmecloud.mcp.tools_read import JOB_ARG, parse_job_ref
+from jobmecloud.mcp.tools_read import JOB_ARG, parse_id, parse_job_ref
 
 STR = {"type": "string"}
 DATE = {"type": "string", "description": "YYYY-MM-DD"}
@@ -75,7 +75,9 @@ def re_evaluate_job(ctx: ToolContext, args: dict):
       _schema({"type": STR, "due_date": DATE, "job": JOB_ARG, "contact_id": {"type": "integer"}, "note": STR},
               ("type", "due_date")), write=True)
 def create_followup(ctx: ToolContext, args: dict):
-    body = _given(args, "type", "due_date", "contact_id", "note")
+    body = _given(args, "type", "due_date", "note")
+    if args.get("contact_id") not in (None, ""):
+        body["contact_id"] = parse_id(args["contact_id"], "contact id")
     if args.get("job") not in (None, ""):
         body["job_id"] = parse_job_ref(args["job"])
     return ctx.call("POST", "/api/followups", json=body)
@@ -84,25 +86,25 @@ def create_followup(ctx: ToolContext, args: dict):
 @tool("complete_followup", "Mark a follow-up done, optionally scheduling the next one on next_date.",
       _schema({"id": {"type": "integer"}, "outcome_note": STR, "next_date": DATE}, ("id",)), write=True)
 def complete_followup(ctx: ToolContext, args: dict):
-    return ctx.call("POST", f"/api/followups/{args.get('id')}/done", json=_given(args, "outcome_note", "next_date"))
+    return ctx.call("POST", f"/api/followups/{parse_id(args.get('id'), 'follow-up id')}/done", json=_given(args, "outcome_note", "next_date"))
 
 
 @tool("snooze_followup", "Hide a follow-up until a date.",
       _schema({"id": {"type": "integer"}, "until": DATE}, ("id", "until")), write=True)
 def snooze_followup(ctx: ToolContext, args: dict):
-    return ctx.call("POST", f"/api/followups/{args.get('id')}/snooze", json=_given(args, "until"))
+    return ctx.call("POST", f"/api/followups/{parse_id(args.get('id'), 'follow-up id')}/snooze", json=_given(args, "until"))
 
 
 @tool("reschedule_followup", "Move a follow-up to a new due date.",
       _schema({"id": {"type": "integer"}, "due_date": DATE}, ("id", "due_date")), write=True)
 def reschedule_followup(ctx: ToolContext, args: dict):
-    return ctx.call("POST", f"/api/followups/{args.get('id')}/reschedule", json=_given(args, "due_date"))
+    return ctx.call("POST", f"/api/followups/{parse_id(args.get('id'), 'follow-up id')}/reschedule", json=_given(args, "due_date"))
 
 
 @tool("cancel_followup", "Cancel a follow-up (it stays in the history).",
       _schema({"id": {"type": "integer"}}, ("id",)), write=True)
 def cancel_followup(ctx: ToolContext, args: dict):
-    return ctx.call("POST", f"/api/followups/{args.get('id')}/cancel")
+    return ctx.call("POST", f"/api/followups/{parse_id(args.get('id'), 'follow-up id')}/cancel")
 
 
 _CONTACT_FIELDS = ("name", "employer", "role", "link", "relationship", "status", "notes")
@@ -122,7 +124,7 @@ def create_contact(ctx: ToolContext, args: dict):
 @tool("update_contact", "Change some fields of a contact; fields you leave out stay as they are.",
       _schema({"id": {"type": "integer"}, **_CONTACT_PROPS}, ("id",)), write=True)
 def update_contact(ctx: ToolContext, args: dict):
-    current = next((c for c in ctx.call("GET", "/api/contacts") if c["id"] == args.get("id")), None)
+    current = next((c for c in ctx.call("GET", "/api/contacts") if c["id"] == parse_id(args.get("id"), "contact id")), None)
     if current is None:
         raise ToolError("No contact with that id")
     body = {k: current.get(k) for k in (*_CONTACT_FIELDS, "job_id")}
@@ -145,7 +147,7 @@ def add_interview(ctx: ToolContext, args: dict):
       write=True)
 def update_interview(ctx: ToolContext, args: dict):
     detail = ctx.call("GET", f"/api/jobs/{parse_job_ref(args.get('job'))}")
-    current = next((i for i in detail.get("interviews", []) if i["id"] == args.get("id")), None)
+    current = next((i for i in detail.get("interviews", []) if i["id"] == parse_id(args.get("id"), "interview id")), None)
     if current is None:
         raise ToolError("No interview with that id on that job")
     body = {k: current.get(k) for k in ("date", "stage", "notes")}

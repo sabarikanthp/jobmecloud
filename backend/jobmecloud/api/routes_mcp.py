@@ -61,7 +61,8 @@ def mcp(message: dict, request: Request) -> Response:
         today = state.today()
         reply = protocol.handle(
             request.app, key, message, now=now, today=today,
-            ai_allowed=lambda: store.spend_ai_call(session, key, today, AI_DAILY_LIMIT))
+            ai_allowed=lambda: store.spend_ai_call(session, key, today, AI_DAILY_LIMIT),
+            host=request.headers.get("host"))
     if reply is None:
         return Response(status_code=202)
     return Response(content=json.dumps(reply), media_type="application/json")
