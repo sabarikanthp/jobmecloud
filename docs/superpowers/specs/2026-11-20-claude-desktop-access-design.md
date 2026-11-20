@@ -9,7 +9,7 @@ The owner checks job fit in existing Claude Desktop chats. They want those chats
 ## Goals
 
 - A **Settings → Claude access** section to create, name, scope, expire and revoke API keys. A key is shown once.
-- An **MCP endpoint** (`/mcp`) that Claude Desktop connects to using a key, exposing JobMe as tools.
+- An **MCP endpoint** (`/api/mcp`) that Claude Desktop connects to using a key, exposing JobMe as tools.
 - Full two-way use: read jobs, resume/profile, follow-ups, contacts, interviews, dashboard; write status, notes, contacts, follow-ups, interviews; add and check jobs.
 - A **"Copy for Claude"** button on each job (and contact/follow-up) that copies a short reference such as `JobMe job 123: Acme – Staff Engineer`; pasting it into a chat lets Claude fetch it with `get_job`.
 - Everything the chat changes behaves exactly like the same change in the app (same validation, same status history/activity), and is marked as made via Claude.
@@ -18,7 +18,7 @@ The owner checks job fit in existing Claude Desktop chats. They want those chats
 
 - No claude.ai browser/mobile connector (those need OAuth, not keys). Claude Desktop only.
 - No deleting anything from chat (jobs, contacts, interviews, follow-up deletion beyond the app's normal "cancel").
-- No access to settings, provider/search API keys, or key management through `/mcp`.
+- No access to settings, provider/search API keys, or key management through `/api/mcp`.
 - JobMe does not generate documents on behalf of the chat (the existing Make docs stays in the app). Documents written in chat are **attached** to a job instead (see Attaching documents).
 - No multi-user model; one owner.
 
@@ -36,7 +36,7 @@ The owner checks job fit in existing Claude Desktop chats. They want those chats
 
 ## Approaches considered
 
-- **A. MCP endpoint inside the existing API (chosen by the owner).** One new router + one key table; the authorizer is skipped for `/mcp` only and the app checks the key. Fewest moving parts; reuses existing logic.
+- **A. MCP endpoint inside the existing API (chosen by the owner).** One new router + one key table; the authorizer is skipped for `/api/mcp` only and the app checks the key. Fewest moving parts; reuses existing logic.
 - B. Separate MCP Lambda with its own DB role. Cleaner isolation, but new infra and duplicated logic; slowest.
 - C. REST + a locally installed script. Fragile on the user's machine, less structured for the chat.
 
@@ -44,7 +44,7 @@ The owner checks job fit in existing Claude Desktop chats. They want those chats
 
 **Keys.** New table `api_key`: id, name, prefix (first 8 chars, for display), sha256 hash, scope (`read` | `readwrite`), created_at, expires_at (nullable), last_used_at, revoked_at. Key format `jmc_` + 32 random bytes base64url. Only the hash is stored; the full key is returned once on creation. Comparison is constant-time. Key management routes (`GET/POST /api/keys`, `DELETE /api/keys/{id}`) sit behind the normal Cognito check, so a key can never create or revoke keys.
 
-**Auth on `/mcp`.** `Authorization: Bearer jmc_…`. Rejects missing, unknown, revoked, expired keys (401, no detail). Write tools require scope `readwrite` (otherwise a clear tool error). Per-key rate limit (default 60 requests/min) and a daily cap on tools that spend AI money (`check_job`, `re_evaluate_job`; default 30/day). Updates `last_used_at`. API Gateway gets one extra route for `/mcp` without the JWT authorizer; all other routes unchanged.
+**Auth on `/api/mcp`.** `Authorization: Bearer jmc_…`. Rejects missing, unknown, revoked, expired keys (401, no detail). Write tools require scope `readwrite` (otherwise a clear tool error). Per-key rate limit (default 60 requests/min) and a daily cap on tools that spend AI money (`check_job`, `re_evaluate_job`; default 30/day). Updates `last_used_at`. API Gateway gets one extra route for `/api/mcp` without the JWT authorizer; all other routes unchanged.
 
 **Transport.** MCP streamable HTTP, stateless, JSON responses. Implemented with the official MCP Python SDK if it fits Lambda cleanly, otherwise a minimal JSON-RPC handler (`initialize`, `tools/list`, `tools/call`) — builder's call.
 
@@ -78,7 +78,7 @@ Not exposed: any delete, settings, provider/search keys, key management, documen
 
 ## Testing
 
-Backend tests: key create/hash/one-time reveal, auth failures (missing/bad/revoked/expired), scope enforcement, rate and daily caps, each tool against a seeded DB, provenance recorded, no delete/secret tools present, `/api/keys` unreachable with a key. Frontend tests for the Settings section and Copy button. CDK test/assertion that only `/mcp` bypasses the authorizer.
+Backend tests: key create/hash/one-time reveal, auth failures (missing/bad/revoked/expired), scope enforcement, rate and daily caps, each tool against a seeded DB, provenance recorded, no delete/secret tools present, `/api/keys` unreachable with a key. Frontend tests for the Settings section and Copy button. CDK test/assertion that only `/api/mcp` bypasses the authorizer.
 
 ## Left to the builder
 

@@ -17,11 +17,12 @@ JobMeCloud is built for one person. Your data lives in **your own AWS account**;
 
 - The website needs a **signed-in token**. There is no public sign-up, so only the account created with `scripts/create_owner.py` exists.
 - Sign-in requires your **password plus a second step** (authenticator app or email code). A password alone never produces a token.
-- Every API route is checked by API Gateway's JWT authorizer before any code runs.
+- Every API route except `/api/mcp` is checked by API Gateway's JWT authorizer before any code runs.
 - **Emailed reports (if you turn them on)** can only start a run if the message is addressed to your report address, comes from your one allowed sender, passes SES's spam and virus checks and carries a valid DKIM signature for the sender's domain. Mail from anyone else is deleted at once and never shown or acted on (a one-line record of the sender address and the word `ignored` stays in the database). At most `inbound_daily_limit` runs start a day, and messages over 2 MB are refused unread. The report text is treated as untrusted: the AI call that reads it has no tools and can only list roles; links are fetched by the same checked page fetcher as everything else.
+- **Claude Desktop access (if you create a key).** One route, `/api/mcp`, is open to API Gateway without a sign-in token, because Claude Desktop cannot sign in with Cognito. The app checks a key instead: keys are random, only a hash is stored, each is shown once, and each can be read-only or read-and-change, expire, and be revoked in Settings. There is a per-minute limit and a daily limit on tools that spend AI money. The tools cannot delete anything or touch settings, AI keys or key management. Changes made this way are recorded as "by Claude: key name". Job postings and notes are labelled untrusted when handed to Claude, but a read-and-change key in a chat that reads a hostile posting is a risk: use read-only keys by default. See [claude-desktop.md](claude-desktop.md).
 - The data bucket and the website bucket cannot be read directly: the website is served only through CloudFront.
 - Permissions are narrowed where it is practical. The scheduler can start only the search worker. The API can manage only schedules whose names begin `jobmecloud-run-`. Only the API can save or delete your API keys; the workers can only read them.
-- Honest limit: every function connects to the database as the cluster's **admin role**, because the app creates and updates its own tables. A narrower database role is planned for the read-only external API.
+- Honest limit: every function connects to the database as the cluster's **admin role**, because the app creates and updates its own tables. The Claude Desktop door (below) uses the same role, so its limits come from the app's own checks, not from the database.
 
 ## What leaves your account
 

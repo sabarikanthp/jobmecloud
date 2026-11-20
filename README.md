@@ -43,6 +43,7 @@ Optional extras, each documented in the guide: your own web address (`-c site_do
 | [docs/security.md](docs/security.md) | Where your data lives, who can reach it, and what to do if a key leaks |
 | [docs/architecture-guide.md](docs/architecture-guide.md) | How it works: architecture, AWS resources, data flow, security, cost |
 | [docs/check-a-job.md](docs/check-a-job.md) | Paste a job you found, get the fit, and decide |
+| [docs/claude-desktop.md](docs/claude-desktop.md) | Use JobMe from Claude Desktop chats: create a key, connect, and what Claude can do |
 | [docs/email-ingest.md](docs/email-ingest.md) | Optional: start runs from a daily emailed report instead of paying for searches |
 | [docs/migrating-from-local.md](docs/migrating-from-local.md) | Bringing your data over from the local JobMe app |
 | [docs/operations.md](docs/operations.md) | Updating, backups and uninstalling |
