@@ -14,10 +14,10 @@ def make_key(client, scope="readwrite", name="Desktop") -> str:
     return key
 
 
-def call_tool(client, key, name, **arguments):
+def call_tool(client, key, tool_name, /, **arguments):
     r = client.post("/api/mcp", headers={"Authorization": f"Bearer {key}"},
                     json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                          "params": {"name": name, "arguments": arguments}})
+                          "params": {"name": tool_name, "arguments": arguments}})
     assert r.status_code == 200, r.text
     return r.json()["result"]
 
