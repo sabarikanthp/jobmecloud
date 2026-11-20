@@ -29,10 +29,11 @@ class Edge(Construct):
             identity_source=["$request.header.Authorization"],
         )
         self.api = apigw.HttpApi(self, "Api", create_default_stage=True)
+        api_integration = integrations.HttpLambdaIntegration("ApiIntegration", api_function)
         self.api.add_routes(
             path="/api/{proxy+}",
             methods=[apigw.HttpMethod.ANY],
-            integration=integrations.HttpLambdaIntegration("ApiIntegration", api_function),
+            integration=api_integration,
             authorizer=authorizer,
         )
 
@@ -41,7 +42,7 @@ class Edge(Construct):
         self.api.add_routes(
             path="/api/mcp",
             methods=[apigw.HttpMethod.POST],
-            integration=integrations.HttpLambdaIntegration("McpIntegration", api_function),
+            integration=api_integration,
         )
 
         api_origin = origins.HttpOrigin(Fn.select(2, Fn.split("/", self.api.api_endpoint)))
