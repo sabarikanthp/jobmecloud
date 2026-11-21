@@ -3,6 +3,7 @@ import { getSetup } from './api.ts'
 import { followUpBadge, useFollowUpCounts } from './followUps.ts'
 import { authEnabled, logout } from './auth.ts'
 import { NavProvider, PAGES, useNav } from './nav.tsx'
+import Connect from './pages/Connect.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import FollowUps from './pages/FollowUps.tsx'
 import Jobs from './pages/Jobs.tsx'
@@ -12,6 +13,8 @@ import Today from './pages/Today.tsx'
 import Wizard from './setup/Wizard.tsx'
 
 export default function App() {
+  // A connector (ChatGPT, Claude) asking for access lands here after the normal sign-in.
+  if (window.location.hash.startsWith('#/connect')) return <Connect />
   return (
     <NavProvider>
       <Shell />

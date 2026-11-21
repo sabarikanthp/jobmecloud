@@ -921,6 +921,8 @@ export interface ApiKeyOut {
   expires_at: string | null
   last_used_at: string | null
   revoked_at: string | null
+  via: 'key' | 'sign-in' // sign-in: a connector (ChatGPT, Claude) the owner approved
+  app_name: string | null
 }
 
 export interface ApiKeyCreated extends ApiKeyOut {
@@ -936,3 +938,23 @@ export const createApiKey = (name: string, scope: 'read' | 'readwrite', expiresI
   })
 
 export const revokeApiKey = (id: number) => request<void>(`/keys/${id}`, { method: 'DELETE' })
+
+export interface OAuthClientInfo {
+  name: string
+  redirect_hosts: string[]
+}
+
+export interface OAuthApproval {
+  client_id: string
+  redirect_uri: string
+  state: string
+  code_challenge: string
+  scope: 'read' | 'readwrite'
+  approve: boolean
+}
+
+export const getOAuthClient = (clientId: string) =>
+  request<OAuthClientInfo>(`/oauth/clients/${encodeURIComponent(clientId)}`)
+
+export const approveOAuth = (body: OAuthApproval) =>
+  request<{ redirect_to: string }>('/oauth/approve', { method: 'POST', body: JSON.stringify(body) })

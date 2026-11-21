@@ -108,3 +108,15 @@ describe('returning to the address you were on', () => {
     expect(window.location.search).toBe('')
   })
 })
+
+describe('consent link through sign-in', () => {
+  it('keeps the whole #/connect request, query included, across the trip to the sign-in page', () => {
+    window.location.hash = '#/connect?client_id=abc&state=x%20y&redirect_uri=https%3A%2F%2Fchatgpt.com%2Fcb'
+    const before = window.location.hash
+    rememberWhere()
+    window.history.replaceState({}, '', window.location.pathname) // what handleCallback does on return
+    expect(window.location.hash).toBe('')
+    restoreWhere()
+    expect(window.location.hash).toBe(before)
+  })
+})

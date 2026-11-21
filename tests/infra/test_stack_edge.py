@@ -19,8 +19,9 @@ def test_api_routes_require_authorizer(template):
             assert "AuthorizerId" in props and props["RouteKey"].endswith("/api/{proxy+}")
         else:
             open_routes.append((props["AuthorizationType"], props["RouteKey"]))
-    # The one exception: Claude Desktop calls /api/mcp with an API key the app checks itself.
-    assert open_routes == [("NONE", "POST /api/mcp")]
+    # The exceptions: /api/mcp (a key or sign-in token the app checks itself) and the connector sign-in routes
+    # (see test_stack_oauth_routes.py, which pins exactly which).
+    assert {r for _, r in open_routes} >= {"POST /api/mcp"} and all(a == "NONE" for a, _ in open_routes)
 
 
 def test_authorizer_checks_the_user_pool_and_client(template):

@@ -145,7 +145,15 @@ export default function ClaudeAccessSection() {
           <tbody>
             {keys.map((k) => (
               <tr key={k.id}>
-                <td>{k.name}</td>
+                <td>
+                  {k.name}
+                  {k.via === 'sign-in' && (
+                    <span className="muted">
+                      {' '}
+                      · Connected via sign-in{k.app_name ? ` (${k.app_name})` : ''}
+                    </span>
+                  )}
+                </td>
                 <td>{SCOPE_LABEL[k.scope]}</td>
                 <td>
                   <code>{k.prefix}…</code>

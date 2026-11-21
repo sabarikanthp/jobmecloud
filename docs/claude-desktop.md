@@ -2,7 +2,7 @@
 
 Connect your Claude Desktop chats to JobMe. In a chat you can say "look at JobMe job 123", ask whether it fits you, and carry on the conversation there. Claude can also update JobMe for you: change a job's status, add notes, set up follow-ups, record interviews, and attach a resume or cover letter that you wrote in the chat.
 
-This works with **Claude Desktop** only. Claude on the web and phone connects to outside tools in a different way (sign-in with OAuth) that does not accept a key.
+This page is for **Claude Desktop**, which connects with a key. ChatGPT and Claude on the web and phone cannot send a key: they connect by signing in instead, see [chatgpt.md](chatgpt.md).
 
 ## Before you start
 

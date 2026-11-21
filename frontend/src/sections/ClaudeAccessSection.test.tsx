@@ -15,7 +15,7 @@ vi.mock('../api.ts', async (importOriginal) => ({
 
 const KEY: ApiKeyOut = {
   id: 1, name: 'Laptop', prefix: 'jmc_Ab12', scope: 'read', created_at: '2026-11-01T10:00:00Z',
-  expires_at: null, last_used_at: null, revoked_at: null,
+  expires_at: null, last_used_at: null, revoked_at: null, via: 'key', app_name: null,
 }
 
 let container: HTMLDivElement
@@ -66,6 +66,15 @@ describe('ClaudeAccessSection', () => {
     expect(text).toContain('Never used')
     expect(text).toContain('Read and change')
     expect(text).toContain('Revoked')
+  })
+
+  it('labels sign-in connections with the app name, and every active row can be revoked', async () => {
+    await mount([KEY, { ...KEY, id: 4, name: 'ChatGPT (sign-in)', prefix: 'jmo_Zz99', via: 'sign-in', app_name: 'ChatGPT' }])
+    const rows = Array.from(container.querySelectorAll('tbody tr'))
+    expect(rows[0].textContent).not.toContain('Connected via sign-in')
+    expect(rows[1].textContent).toContain('Connected via sign-in')
+    expect(rows[1].textContent).toContain('ChatGPT')
+    expect(rows.every((r) => Array.from(r.querySelectorAll('button')).some((b) => b.textContent === 'Revoke'))).toBe(true)
   })
 
   it('creates a key, shows it once with the config, and hides it when done', async () => {
