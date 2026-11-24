@@ -1,6 +1,6 @@
 # How JobMeCloud works: an architecture guide
 
-Updated 17 Nov 2026. It follows the code as it is today; where something is not built or not yet proven, it says so. For the hands-on steps see [deploy.md](deploy.md). For the reasoning behind the original design see [the design spec](superpowers/specs/2026-11-14-aws-migration-design.md).
+Updated 24 Nov 2026. It follows the code as it is today; where something is not built or not yet proven, it says so. For the hands-on steps see [deploy.md](deploy.md). For the reasoning behind the original design see [the design spec](superpowers/specs/2026-11-14-aws-migration-design.md).
 
 ## 1. The 60-second answer
 
@@ -64,8 +64,8 @@ All of this is created by `cdk deploy` from [`infra/`](../infra). Names are the 
 | Cognito user pool | `UserPool` | Essentials plan, MFA **required** (authenticator app or email), no sign-up, no password reset, 12-character passwords, deletion protection | The one account |
 | Cognito app client | `SpaClient` | Authorization-code flow, no secret, 1 h tokens, 30-day refresh | The browser app |
 | Cognito domain and branding | `LoginDomain` | Managed login (the newer version) | The hosted sign-in page |
-| API Gateway HTTP API | `Api` | Single route `/api/{proxy+}`, JWT authorizer | Front door for the API Lambda |
-| CloudFront distribution | `Distribution` | Default behaviour to S3 via OAC, `/api/*` to API Gateway, caching off for the API; optionally your own hostname and an ACM certificate from `us-east-1` | One HTTPS address for site and API |
+| API Gateway HTTP API | `Api` | Route `/api/{proxy+}` with the JWT authorizer, plus five routes without it for the chat connectors (`POST /api/mcp`, `GET /.well-known/{proxy+}`, `POST /api/oauth/register`, `GET /api/oauth/authorize`, `POST /api/oauth/token`) | Front door for the API Lambda |
+| CloudFront distribution | `Distribution` | Default behaviour to S3 via OAC, `/api/*` and `/.well-known/*` to API Gateway, caching off for both; optionally your own hostname and an ACM certificate from `us-east-1` | One HTTPS address for site and API |
 | Scheduler IAM role | `SchedulerRole` | Can invoke only the run worker | What EventBridge Scheduler assumes |
 | AWS Budget | `MonthlyBudget` | $5 monthly, email at 80% actual and 100% forecast | A spending alert, not a spending stop |
 | *Optional:* mail bucket, SES receipt rule set, ingest function | `Inbound` | Private bucket with 30-day expiry, one rule for one address, 512 MB and 10 minutes | Emailed reports ([email-ingest.md](email-ingest.md)) |
@@ -98,6 +98,8 @@ All Python is under `backend/jobmecloud/`. About 11,500 lines of Python in the b
 | Scheduling | `scheduling/eventbridge.py`, `api/routes_schedule.py` | Turns your days and times into EventBridge schedules |
 | Search agent | `llm/loop.py`, `agents/jobscout/` | The loop, its tools, and the pipeline around it |
 | Documents | `applydocs/` | Draft, self-check, revise, code check, render |
+| Resume library | `resumes/store.py`, `resumes/context.py`, `api/routes_resumes.py` | Several resumes with one default, a short profile (card) of each, and picking the closest one for a job |
+| Chat connectors | `api/routes_mcp.py`, `mcp/`, `keys/store.py`, `oauth/`, `api/routes_oauth.py`, `api/routes_keys.py` | The MCP endpoint and its tools, API keys for Claude Desktop, OAuth sign-in for ChatGPT and Claude on the web |
 | Providers | `llm/*_provider.py`, `factory.py`, `steps.py`, `pricing.py` | Anthropic and OpenAI-compatible adapters, per-step model choice, cost cap |
 | Admin scripts | `admin/`, `scripts/` | Build, migrate, create or reset the owner, publish the site, import local data |
 | Infrastructure | `infra/` | The CDK app: stack, auth, edge |
@@ -183,7 +185,15 @@ workspace/applications/...   generated documents, one folder per job
 
 ### Claude Desktop access
 
-A second front door for Claude Desktop. `POST /api/mcp` (`api/routes_mcp.py`) speaks stateless MCP (JSON-RPC) and is the only API Gateway route without the JWT authorizer. It checks a bearer key (`keys/store.py`: random, hashed, scoped `read` or `readwrite`, revocable, with a per-minute and a daily AI-spend limit) and then runs a tool from `mcp/`. Each tool calls one of the app's own routes in-process (`mcp/registry.py`, a `TestClient`), so validation, history and S3 sync match the website; a context variable (`jobs/actor.py`) records the change as "claude:key name". The one tool that writes files, `attach_documents` (`applydocs/attach.py`), puts a chat-written resume or cover letter into the job's folder. Keys are made in Settings (`api/routes_keys.py`, `sections/ClaudeAccessSection.tsx`). See [claude-desktop.md](claude-desktop.md).
+A second front door for chat assistants. `POST /api/mcp` (`api/routes_mcp.py`) speaks stateless MCP (JSON-RPC) and has no JWT authorizer, because the assistants cannot sign in with Cognito. It checks a bearer token, which is either a key made in Settings (Claude Desktop) or an OAuth access token (ChatGPT and Claude on the web or phone, see below). Both are stored hashed in one table (`keys/store.py`: random, scoped `read` or `readwrite`, revocable, with a per-minute and a daily AI-spend limit), and then it runs a tool from `mcp/`. Each tool calls one of the app's own routes in-process (`mcp/registry.py`, a `TestClient`), so validation, history and S3 sync match the website; a context variable (`jobs/actor.py`) records the change as "claude:key name". The one tool that writes files, `attach_documents` (`applydocs/attach.py`), puts a chat-written resume or cover letter into the job's folder. Keys are made in Settings (`api/routes_keys.py`, `sections/ClaudeAccessSection.tsx`). See [claude-desktop.md](claude-desktop.md).
+
+### Sign-in with OAuth for ChatGPT and Claude
+
+Connectors on the web cannot be given a key, so they sign in instead (`oauth/store.py`, `api/routes_oauth.py`, and a consent page in the website). Four more routes bypass the authorizer because the connector has no login yet: `/.well-known/*` (public discovery metadata, which CloudFront sends to the API at the site root), `/api/oauth/register` (rate-limited, only https or localhost return addresses), `/api/oauth/authorize` and `/api/oauth/token`. Each checks what it is given. The authorize step shows a consent page in the website; **approving** (`/api/oauth/approve`) is behind the normal Cognito sign-in, so only you, with your password and two-step code, can grant access, choosing read-only or read-and-change. The token swap needs a one-time code (5 minutes) and a PKCE secret. Three tables hold this (`OAuthClient`, `OAuthCode`, `OAuthGrant`); a granted connection appears in Settings, Claude access, can be revoked there, and ends 30 days after its last use. It needs your own web address, because the sign-in is anchored to it. See [chatgpt.md](chatgpt.md) and [security.md](security.md).
+
+### Resumes and picking one
+
+The workspace holds a library of resumes (`resumes/store.py`), each with a reading, an optional mapping that lets a `.docx` keep its layout, and one **default**. Making documents starts from one of them (`applydocs/make_docs.py`, `_choose_resume`): a resume you name is used as is. With none named, or "auto", it asks the AI which resume's profile is closest to the job, but only when the default and at least one other have a profile. A profile (`resumes/context.py`) is a small AI-written card, built on request (**Build context** in Settings) and rebuilt only when the resume changes. Without a profile the default is used directly, so a newly uploaded default is never passed over. See [resumes.md](resumes.md).
 
 ## 7. The database layer
 

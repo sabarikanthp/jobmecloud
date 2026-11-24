@@ -11,8 +11,9 @@ JobMeCloud is the cloud version of JobMe, which runs on one computer. The search
 - Automatic runs even when your computer is off, in either of two ways: scheduled web searches at the days and times you pick, or (usually far cheaper) a daily **emailed report** from another tool, for example a ChatGPT scheduled task that does the searching and emails its result, which JobMeCloud then researches, scores and acts on by itself ([docs/email-ingest.md](docs/email-ingest.md)).
 - **Check a job** you found yourself: paste its text or link, get an AI fit score, then apply, skip or make documents ([docs/check-a-job.md](docs/check-a-job.md)).
 - A score from 0 to 100 for every posting, against your wishes and deal-breakers.
-- A tailored resume and cover letter for the best matches, checked so they never claim anything that is not in your real resume.
+- A tailored resume and cover letter for the best matches, checked so they never claim anything that is not in your real resume. Keep several resumes and JobMe starts from the closest one, or the one you choose ([docs/resumes.md](docs/resumes.md)).
 - A tracker for every job, contact and follow-up.
+- **Use it from a chat:** connect Claude Desktop with a key ([docs/claude-desktop.md](docs/claude-desktop.md)), or ChatGPT and Claude on the web or phone by signing in ([docs/chatgpt.md](docs/chatgpt.md)), to review jobs, change statuses and manage follow-ups. You choose read-only or read-and-change for each connection and can revoke it at any time.
 - Sign-in with your email and password plus an authenticator app or an email code. There is no public sign-up: only the account you create can get in.
 
 ## Set it up
@@ -43,7 +44,9 @@ Optional extras, each documented in the guide: your own web address (`-c site_do
 | [docs/security.md](docs/security.md) | Where your data lives, who can reach it, and what to do if a key leaks |
 | [docs/architecture-guide.md](docs/architecture-guide.md) | How it works: architecture, AWS resources, data flow, security, cost |
 | [docs/check-a-job.md](docs/check-a-job.md) | Paste a job you found, get the fit, and decide |
+| [docs/resumes.md](docs/resumes.md) | Several resumes, the default, and which one documents start from |
 | [docs/claude-desktop.md](docs/claude-desktop.md) | Use JobMe from Claude Desktop chats: create a key, connect, and what Claude can do |
+| [docs/chatgpt.md](docs/chatgpt.md) | Connect ChatGPT, or Claude on the web or phone, by signing in (needs your own web address) |
 | [docs/email-ingest.md](docs/email-ingest.md) | Optional: start runs from a daily emailed report instead of paying for searches |
 | [docs/migrating-from-local.md](docs/migrating-from-local.md) | Bringing your data over from the local JobMe app |
 | [docs/operations.md](docs/operations.md) | Updating, backups and uninstalling |
@@ -56,6 +59,7 @@ Optional extras, each documented in the guide: your own web address (`-c site_do
 ```
 Browser -> CloudFront -> S3 (the website)
                       -> API Gateway (needs a signed-in token) -> api Lambda
+Claude Desktop / ChatGPT / Claude web -> /api/mcp (key or OAuth sign-in, checked by the app) -> api Lambda
 api Lambda -> run-worker Lambda (reads, scores, searches) and docs-worker Lambda (writes documents)
 EventBridge Scheduler -> run-worker Lambda                       (optional web-search schedule)
 Emailed report -> SES -> mail bucket -> ingest Lambda -> run-worker Lambda   (optional)
