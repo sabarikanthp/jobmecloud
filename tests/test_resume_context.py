@@ -59,6 +59,17 @@ def test_with_profiles_the_closest_resume_is_picked_and_said_so(data_dir, engine
     assert default_entry(data_dir).name == "Main"
 
 
+def test_a_new_default_without_a_profile_is_used_not_skipped_by_the_pick(data_dir, engine):
+    _ready(data_dir)  # Main and Platform both have profiles
+    newest = FIXTURE_READING.model_copy(update={"summary": "NEWEST DEFAULT summary."})
+    add_resume(data_dir, name="Newest", filename="n.docx", data=make_resume_docx(), reading=newest,
+               mapping=fixture_mapping(), make_default=True, now=NOW)
+    p, r = _run(data_dir, engine, [draft_json_for_fixture(), '{"problems": []}'])
+    assert len(p.calls) == 2  # no pick call: the default cannot be compared, so it is used
+    assert "NEWEST DEFAULT" in p.calls[0]["messages"][0]["content"]
+    assert "Started from" not in r.note
+
+
 def test_a_named_resume_is_used_without_picking_and_a_bad_pick_keeps_the_default(data_dir, engine):
     other = _ready(data_dir)
     p, _ = _run(data_dir, engine, [draft_json_for_fixture(), '{"problems": []}'], resume_id=other.id)

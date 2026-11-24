@@ -243,9 +243,11 @@ def _choose_resume(data_dir: Path, engine: Engine, job_id: int, provider: Provid
     if resume_id and resume_id != AUTO:
         return resume_id, None
     cards = ready_cards(data_dir)
-    if len(cards) < 2:
-        return None, None
     entry = default_entry(data_dir)
+    if len(cards) < 2 or (entry is not None and entry.id not in {e.id for e, _ in cards}):
+        # With no profile the default (say, one just uploaded) cannot compete, so choosing among the others
+        # would silently skip it: use it.
+        return None, None
     try:
         pick = pick_resume(provider, model, _load_job(engine, job_id), cards, entry.id if entry else None, costs)
     except Exception:  # choosing is a convenience: if it fails the default is used
