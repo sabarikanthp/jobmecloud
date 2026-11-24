@@ -90,9 +90,17 @@ See [email-ingest.md](email-ingest.md) for how it works. Start with `uv run pyth
 
 **The email is `failed`.** The note says why (for example the report could not be read, or no AI connection is set up). Fix it and replay it.
 
-## Claude Desktop
+## Resumes
+
+**Documents were made from a different resume than my default.** Open the job and read the note under the documents. If it says "Started from ... (best match ...)", every resume has a profile and JobMe chose the closest one for that job. Pick the resume you want in **Start from** and regenerate. See [resumes.md](resumes.md).
+
+**A new default resume is ignored in automatic documents.** Update to a version from 24 Nov 2026 or later: before it, a new default without a profile (**Build context** not yet pressed) was left out of the automatic choice. Then regenerate the documents you want redone.
+
+## Claude Desktop, ChatGPT and Claude on the web
 
 **Claude Desktop shows no JobMe tools, a 401, or "This key is read-only".** See the troubleshooting section of [claude-desktop.md](claude-desktop.md).
+
+**ChatGPT or Claude on the web cannot connect, says the server "does not support OAuth", or stopped working.** See the troubleshooting section of [chatgpt.md](chatgpt.md). It needs your own web address (`site_domain`), the full update in [operations.md](operations.md), and `https://<your site>/.well-known/oauth-authorization-server` must load in a browser.
 
 ## Still stuck
 
