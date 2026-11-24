@@ -34,6 +34,7 @@ from jobmecloud.api import (
     routes_tracking,
     routes_keys,
     routes_mcp,
+    routes_oauth,
     routes_watchlist,
 )
 from jobmecloud.agents.jobscout.pipeline import RunDeps
@@ -123,6 +124,8 @@ def create_app(
     app.include_router(routes_watchlist.router, prefix="/api")
     app.include_router(routes_keys.router, prefix="/api")
     app.include_router(routes_mcp.router, prefix="/api")
+    app.include_router(routes_oauth.well_known)
+    app.include_router(routes_oauth.router, prefix="/api")
     app.include_router(routes_import.router, prefix="/api")
     app.include_router(routes_runs.router, prefix="/api")
     app.include_router(routes_inbound.router, prefix="/api")

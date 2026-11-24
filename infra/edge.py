@@ -37,13 +37,20 @@ class Edge(Construct):
             authorizer=authorizer,
         )
 
-        # The one exception: Claude Desktop cannot sign in with Cognito, so it calls this route with an API key
-        # that the app itself checks (hashed, revocable, scoped, rate-limited). More specific than the route above.
-        self.api.add_routes(
-            path="/api/mcp",
-            methods=[apigw.HttpMethod.POST],
-            integration=api_integration,
-        )
+        # The exceptions: Claude Desktop cannot sign in with Cognito, so it calls /api/mcp with an API key that the
+        # app itself checks (hashed, revocable, scoped, rate-limited). ChatGPT and Claude on the web use OAuth: they
+        # must find the sign-in metadata, register, start a sign-in and swap a code for tokens before they have any
+        # login, so those four routes are open too and each checks what it is given. Approving a connection
+        # (/api/oauth/approve) is NOT here: only the owner, signed in, can reach it. All are more specific than the
+        # route above.
+        for path, method in (
+            ("/api/mcp", apigw.HttpMethod.POST),
+            ("/.well-known/{proxy+}", apigw.HttpMethod.GET),
+            ("/api/oauth/register", apigw.HttpMethod.POST),
+            ("/api/oauth/authorize", apigw.HttpMethod.GET),
+            ("/api/oauth/token", apigw.HttpMethod.POST),
+        ):
+            self.api.add_routes(path=path, methods=[method], integration=api_integration)
 
         api_origin = origins.HttpOrigin(Fn.select(2, Fn.split("/", self.api.api_endpoint)))
         self.distribution = cloudfront.Distribution(
@@ -54,12 +61,28 @@ class Edge(Construct):
             default_behavior=cloudfront.BehaviorOptions(
                 origin=origins.S3BucketOrigin.with_origin_access_control(site_bucket),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                # The page where you approve a connector must never be shown inside another site's frame.
+                response_headers_policy=cloudfront.ResponseHeadersPolicy(
+                    self, "SiteHeaders",
+                    security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
+                        frame_options=cloudfront.ResponseHeadersFrameOptions(
+                            frame_option=cloudfront.HeadersFrameOption.DENY, override=True),
+                    ),
+                ),
             ),
             additional_behaviors={
                 "/api/*": cloudfront.BehaviorOptions(
                     origin=api_origin,
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                ),
+                # The sign-in metadata connectors look for at the site root (RFC 8414 and RFC 9728).
+                "/.well-known/*": cloudfront.BehaviorOptions(
+                    origin=api_origin,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD,
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),

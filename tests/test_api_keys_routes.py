@@ -37,3 +37,26 @@ def test_name_required_and_trimmed(client):
 def test_expiry_days_sets_expires_at(client):
     assert _create(client, expires_in_days=30).json()["expires_at"] is not None
     assert _create(client, expires_in_days=0).status_code == 422
+
+
+def test_list_marks_sign_in_connections(client, monkeypatch):
+    import base64
+    import hashlib
+    from datetime import datetime, timezone
+
+    from sqlmodel import Session
+
+    from jobmecloud.oauth import store as oauth
+
+    verifier = "v" * 50
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    now = datetime.now(timezone.utc)
+    _create(client, name="Desktop")
+    with Session(client.app.state.engine) as s:
+        app = oauth.register_client(s, name="ChatGPT", redirect_uris=["https://chatgpt.com/cb"], now=now)
+        code = oauth.issue_code(s, client=app, redirect_uri="https://chatgpt.com/cb", code_challenge=challenge, scope="read", now=now)
+        oauth.exchange_code(s, client_id=app.client_id, code=code, redirect_uri="https://chatgpt.com/cb", verifier=verifier, now=now)
+    rows = {r["name"]: r for r in client.get("/api/keys").json()}
+    assert rows["Desktop"]["via"] == "key" and rows["Desktop"]["app_name"] is None
+    sign_in = next(r for n, r in rows.items() if n != "Desktop")
+    assert sign_in["via"] == "sign-in" and sign_in["app_name"] == "ChatGPT"
