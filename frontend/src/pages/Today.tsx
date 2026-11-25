@@ -321,7 +321,7 @@ export default function Today() {
             <details className="result-list" open={matches.length === 0 || undefined}>
               <summary>Below your cutoff ({below.length})</summary>
               <div className="table-wrap">
-                <table className="jobs-table below-table">
+                <table className="jobs-table below-table stack">
                   <thead>
                     <tr>
                       <th>Match</th>
@@ -336,7 +336,7 @@ export default function Today() {
                   <tbody>
                     {below.map(({ job }) => (
                       <tr key={job.id}>
-                        <td className="nowrap">
+                        <td className="nowrap" data-label="Match">
                           <strong>{job.match_score}%</strong>
                         </td>
                         <td className="job-cell">
@@ -348,10 +348,10 @@ export default function Today() {
                             </div>
                           )}
                         </td>
-                        <td className="nowrap">{formatPay(job.pay_min, job.pay_max)}</td>
-                        <td>{[job.location, job.work_mode].filter(Boolean).join(' · ') || '—'}</td>
-                        <td className="why-cell">{job.reasons || '—'}</td>
-                        <td className="why-cell">{job.gaps || '—'}</td>
+                        <td className="nowrap" data-label="Pay">{formatPay(job.pay_min, job.pay_max)}</td>
+                        <td data-label="Location">{[job.location, job.work_mode].filter(Boolean).join(' · ') || '—'}</td>
+                        <td className="why-cell" data-label="Why">{job.reasons || '—'}</td>
+                        <td className="why-cell" data-label="Gaps">{job.gaps || '—'}</td>
                         <td className="actions-cell">
                           {canMakeDocs(job.status) && <MakeDocsButton job={job} busyId={busyId} runDocs={runDocs} />}
                           <StatusActions job={job} skipReasons={skipReasons} onChanged={changed} />
@@ -370,7 +370,7 @@ export default function Today() {
                 JobMe couldn't open or read these postings, so they weren't scored. Open them yourself to check.
               </p>
               <div className="table-wrap">
-                <table className="jobs-table below-table">
+                <table className="jobs-table below-table stack">
                   <thead>
                     <tr>
                       <th>Job</th>
@@ -387,9 +387,9 @@ export default function Today() {
                           {job.employer} — {job.title} <StatusBadge status={job.status} />{' '}
                           <ApplyLink job={job} label="Open posting" />
                         </td>
-                        <td className="nowrap">{formatPay(job.pay_min, job.pay_max)}</td>
-                        <td>{[job.location, job.work_mode].filter(Boolean).join(' · ') || '—'}</td>
-                        <td className="why-cell">
+                        <td className="nowrap" data-label="Pay">{formatPay(job.pay_min, job.pay_max)}</td>
+                        <td data-label="Location">{[job.location, job.work_mode].filter(Boolean).join(' · ') || '—'}</td>
+                        <td className="why-cell" data-label="Why not">
                           {job.flags.length > 0 ? <Chips flags={job.flags} /> : '—'}
                           <RepeatBanner job={job} onChanged={changed} />
                         </td>

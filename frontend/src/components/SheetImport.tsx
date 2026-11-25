@@ -383,7 +383,7 @@ export default function SheetImport({ fields, onClose, onImported }: Props) {
                 <strong>{countsText(report.counts)}</strong>
               </p>
               {report.sample.length > 0 && (
-                <table>
+                <table className="stack">
                   <thead>
                     <tr>
                       <th scope="col">Row</th>
@@ -396,11 +396,11 @@ export default function SheetImport({ fields, onClose, onImported }: Props) {
                   <tbody>
                     {report.sample.map((r) => (
                       <tr key={r.row}>
-                        <td>{r.row}</td>
-                        <td>{r.employer}</td>
-                        <td>{r.title}</td>
-                        <td>{r.action}</td>
-                        <td>{r.status}</td>
+                        <td data-label="Row">{r.row}</td>
+                        <td data-label="Employer or name">{r.employer}</td>
+                        <td data-label="Title">{r.title}</td>
+                        <td data-label="Result">{r.action}</td>
+                        <td data-label="Status">{r.status}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -410,7 +410,7 @@ export default function SheetImport({ fields, onClose, onImported }: Props) {
                 <>
                   <h4>Status words</h4>
                   <p className="help">Choose the JobMe status for each word in your file. Words set to Don't set are left to the next column, or land as New.</p>
-                  <table>
+                  <table className="stack">
                     <thead>
                       <tr>
                         <th scope="col">Word in your file</th>
@@ -421,9 +421,9 @@ export default function SheetImport({ fields, onClose, onImported }: Props) {
                     <tbody>
                       {rowsWithWords.map((w) => (
                         <tr key={w.word}>
-                          <td>{w.word}</td>
-                          <td>{w.count}</td>
-                          <td>
+                          <td data-label="Word">{w.word}</td>
+                          <td data-label="Rows">{w.count}</td>
+                          <td data-label="JobMe status">
                             <select
                               aria-label={`Status for ${w.word}`}
                               value={w.status}

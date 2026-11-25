@@ -167,7 +167,7 @@ export default function SpreadsheetImport({
           {sheet.sample_rows.length === 0 || mapped.length === 0 ? (
             <p className="muted">(no rows)</p>
           ) : (
-            <table>
+            <table className="stack">
               <thead>
                 <tr>
                   {mapped.map((f) => (
@@ -179,7 +179,7 @@ export default function SpreadsheetImport({
                 {sheet.sample_rows.slice(0, 5).map((row, i) => (
                   <tr key={i}>
                     {mapped.map((f) => (
-                      <td key={f.key}>{row[sheet.columns.indexOf(mapping[f.key] as string)] ?? ''}</td>
+                      <td key={f.key} data-label={f.label}>{row[sheet.columns.indexOf(mapping[f.key] as string)] ?? ''}</td>
                     ))}
                   </tr>
                 ))}

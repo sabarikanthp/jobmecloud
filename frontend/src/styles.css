@@ -282,7 +282,7 @@ h2 .overdue, h3 .overdue { color: var(--bad); font-weight: 600; }
 .filter-row > label { flex: 1 1 150px; min-width: 0; margin-bottom: 0; }
 .filter-row > button { flex: 0 0 auto; }
 /* Multi-field forms: responsive grid of fields. */
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 16px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 0 16px; }
 .form-grid > .span-all { grid-column: 1 / -1; }
 .table-wrap { overflow-x: auto; margin-top: 12px; }
 .jobs-table { width: 100%; border-collapse: collapse; background: var(--panel); font-size: 14px; }
@@ -308,7 +308,7 @@ h2 .overdue, h3 .overdue { color: var(--bad); font-weight: 600; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Dashboard */
-.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 0 16px; align-items: start; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 0 16px; align-items: start; }
 .bars { display: flex; flex-direction: column; gap: 6px; max-width: 720px; }
 .bar-row { display: grid; grid-template-columns: minmax(90px, 160px) 1fr minmax(60px, auto); gap: 10px; align-items: center; }
 .bar-track { display: block; height: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
@@ -346,3 +346,106 @@ label.check { display: inline-flex; align-items: center; gap: 6px; font-weight: 
 .duplicate-candidate { padding: 6px 0; border-bottom: 1px solid var(--border); }
 .duplicate-picker input[type='search'] { min-width: 14rem; }
 .re-evaluate textarea { width: 100%; box-sizing: border-box; font: inherit; }
+
+/*
+  Phones, built around the iPhone 16 Pro: 402 x 874 points upright, 874 x 402 on its side.
+  Everything below applies only there; the desktop layout is untouched.
+*/
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { overflow-wrap: break-word; }
+  h1 { font-size: 24px; line-height: 1.25; }
+  h2 { font-size: 19px; margin-top: 20px; }
+  .card h1 { font-size: 20px; }
+  .card h2:first-child { margin-top: 0; }
+  .card { padding: 14px; }
+
+  /* The sidebar becomes a tab bar at the bottom, clear of the home indicator. */
+  .shell { display: block; min-height: 100dvh; }
+  .nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    width: auto;
+    flex-direction: row;
+    gap: 2px;
+    padding: 4px max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+    border-right: 0;
+    border-top: 1px solid var(--border);
+  }
+  .brand { display: none; }
+  .nav-item { position: relative; flex: 1 1 0; min-width: 0; min-height: 50px; padding: 4px 0; text-align: center; font-size: 11px; white-space: nowrap; }
+  .nav-count { position: absolute; top: 2px; left: calc(50% + 8px); float: none; min-width: 18px; padding: 0 5px; font-size: 11px; line-height: 18px; }
+  .content {
+    padding:
+      max(12px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      calc(72px + env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+  .loading { padding: 16px; }
+
+  /* Setup has nine steps: a strip across the top that scrolls sideways. */
+  .wizard-nav { position: static; overflow-x: auto; border-top: 0; border-bottom: 1px solid var(--border); padding-top: max(4px, env(safe-area-inset-top)); padding-bottom: 4px; }
+  .wizard-nav .nav-item { flex: 0 0 auto; width: auto; padding: 4px 12px; font-size: 13px; }
+  .wizard-nav + .content { padding-top: 12px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+  /* Safari zooms the page into any field with text under 16px. */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Finger-sized controls (44pt). */
+  button:not(.link, .tip-button, .sort-btn),
+  select,
+  input:not([type='checkbox'], [type='radio'], [type='file']),
+  summary { min-height: 44px; }
+  summary { padding: 10px 0; margin-bottom: 0; }
+  button.link { min-height: 32px; padding-left: 0; padding-right: 0; text-align: left; }
+  input[type='checkbox'], input[type='radio'] { width: 20px; height: 20px; vertical-align: middle; }
+  .card label.radio, label.check { min-height: 44px; display: flex; align-items: center; gap: 8px; }
+  input[type='date'], input[type='datetime-local'] { -webkit-appearance: none; appearance: none; min-width: 0; background: var(--panel); text-align: left; }
+  input[type='file'] { max-width: 100%; }
+  .row-status select { max-width: 100%; }
+
+  /* The "?" keeps its size but gets a bigger touch area, and its note opens where it fits on screen. */
+  .tip-button { position: relative; }
+  .tip-button::after { content: ''; position: absolute; inset: -12px; }
+  .tip-bubble { position: fixed; top: auto; left: 16px; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 30; width: auto; }
+
+  /* Tables stack: each row is a card, each cell a line named by its data-label. */
+  .table-wrap { overflow-x: visible; }
+  table.stack, .stack tbody, .stack tr, .stack td { display: block; width: 100%; }
+  table.stack { background: none; }
+  .stack tr { margin-bottom: 10px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+  table.stack td { width: 100%; min-width: 0; padding: 3px 0; border: 0; overflow-wrap: anywhere; }
+  table.stack td:empty { display: none; }
+  table.stack td[data-label] { position: relative; padding-left: 7.5rem; min-height: 1.5em; }
+  .stack td[data-label]::before { content: attr(data-label); position: absolute; left: 0; top: 3px; width: 7rem; color: var(--muted); font-size: 13px; }
+  .stack td[data-label]:has(input, select) { min-height: 50px; }
+  .stack td[data-label]:has(input, select)::before { top: 14px; }
+  .below-table .nowrap { white-space: normal; }
+  table.stack.below-table td { width: 100%; min-width: 0; }
+  .jobs-table.stack td:first-child { font-weight: 600; font-size: 16px; }
+  .jobs-table.stack td > a { display: inline-block; padding: 3px 0; }
+  .stack .row-status { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+  /* Column headings go, except the ones that sort: those stay as a row of buttons. */
+  .stack thead { display: block; }
+  .stack thead tr { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; background: none; border: 0; }
+  .jobs-table.stack th { display: none; padding: 0; border: 0; }
+  .jobs-table.stack th:has(button) { display: block; }
+  .jobs-table.stack .sort-btn { min-height: 36px; padding: 4px 10px; border: 1px solid var(--border); background: var(--panel); border-radius: 999px; }
+  table.stack:not(.jobs-table) thead { display: none; }
+
+  .filter-row > label { flex-basis: 140px; }
+  .details .detail { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  .bar-row { grid-template-columns: minmax(70px, 30%) 1fr minmax(40px, auto); gap: 8px; }
+  .bar-caption { display: block; }
+  /* Open the weekly chart on the newest weeks (the right-hand end) rather than the oldest. */
+  .columns { direction: rtl; }
+  .columns svg { direction: ltr; margin-right: auto; }
+  .duplicate-picker input[type='search'] { min-width: 0; width: 100%; }
+  pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+  code, a { overflow-wrap: anywhere; }
+}

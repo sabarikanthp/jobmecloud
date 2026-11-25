@@ -51,10 +51,10 @@ const toBody = (d: Draft): WatchlistEmployer => ({
 function DraftCells({ draft, onChange, label }: { draft: Draft; onChange: (d: Draft) => void; label: string }) {
   return (
     <>
-      <td>
+      <td data-label="Employer">
         <input aria-label={`${label}: employer`} value={draft.name} onChange={(e) => onChange({ ...draft, name: e.target.value })} />
       </td>
-      <td>
+      <td data-label="Priority">
         <select
           aria-label={`${label}: priority`}
           value={draft.priority}
@@ -67,10 +67,10 @@ function DraftCells({ draft, onChange, label }: { draft: Draft; onChange: (d: Dr
           ))}
         </select>
       </td>
-      <td>
+      <td data-label="Careers page">
         <input aria-label={`${label}: careers page`} value={draft.url} onChange={(e) => onChange({ ...draft, url: e.target.value })} />
       </td>
-      <td>
+      <td data-label="Day">
         <select aria-label={`${label}: day`} value={draft.day} onChange={(e) => onChange({ ...draft, day: e.target.value })}>
           <option value="">Any</option>
           {DAYS.map((d) => (
@@ -164,7 +164,7 @@ export default function WatchlistSection({ mode, onSaved }: { mode: SectionMode;
       {loaded && (
         <>
           <span className="help">Optional. Companies you would love to work for. Changes here are saved right away.</span>
-          <table className="watchlist">
+          <table className="watchlist stack">
             <thead>
               <tr>
                 <th>Employer</th>
@@ -184,10 +184,10 @@ export default function WatchlistSection({ mode, onSaved }: { mode: SectionMode;
                       <DraftCells draft={editing.draft} label={r.name} onChange={(d) => setEditing({ id: r.id, draft: d })} />
                     ) : (
                       <>
-                        <td>{r.name}</td>
-                        <td>{priorityLabel(r.priority)}</td>
-                        <td>{r.careers_url ?? ''}</td>
-                        <td>{dayLabel(r.rotation_day)}</td>
+                        <td data-label="Employer">{r.name}</td>
+                        <td data-label="Priority">{priorityLabel(r.priority)}</td>
+                        <td data-label="Careers page">{r.careers_url ?? ''}</td>
+                        <td data-label="Day">{dayLabel(r.rotation_day)}</td>
                       </>
                     )}
                     <td>
