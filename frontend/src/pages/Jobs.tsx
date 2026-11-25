@@ -455,7 +455,7 @@ function JobsTab() {
 
       {rows.length > 0 && (
         <div className="table-wrap">
-          <table className="jobs-table">
+          <table className="jobs-table stack">
             <thead>
               <tr>
                 {sortHeader('employer', 'Employer')}
@@ -490,24 +490,24 @@ function JobsTab() {
                       </div>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <RowStatus job={r} skipReasons={skipReasons} onChanged={() => setVersion((v) => v + 1)} />
                   </td>
-                  <td>{r.match_score == null ? '' : `${r.match_score}%`}</td>
-                  <td>{fmtDate(r.applied_date)}</td>
-                  <td>{fmtDate(r.first_response_date)}</td>
-                  <td>{fmtDate(r.first_seen_date)}</td>
-                  <td>
+                  <td data-label="Match">{r.match_score == null ? '' : `${r.match_score}%`}</td>
+                  <td data-label="Applied">{fmtDate(r.applied_date)}</td>
+                  <td data-label="Response">{fmtDate(r.first_response_date)}</td>
+                  <td data-label="Found">{fmtDate(r.first_seen_date)}</td>
+                  <td data-label="Source">
                     {r.source}
                     {r.linkedin && <span className="chip">LinkedIn</span>}
                   </td>
-                  <td>{r.docs_ready && <span className="docs-mark">Docs</span>}</td>
+                  <td data-label="Docs">{r.docs_ready && <span className="docs-mark">Docs</span>}</td>
                   {choice.builtin.map((b) => (
-                    <td key={b}>{builtinCell(b, r)}</td>
+                    <td key={b} data-label={BUILTIN_LABELS[b]}>{builtinCell(b, r)}</td>
                   ))}
                   {shown.map((x) => {
                     const v = r.fields?.[String(x.id)] ?? ''
-                    return <td key={x.id}>{x.type === 'date' ? fmtDate(v || null) : v}</td>
+                    return <td key={x.id} data-label={x.name}>{x.type === 'date' ? fmtDate(v || null) : v}</td>
                   })}
                 </tr>
               ))}

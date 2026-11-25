@@ -132,7 +132,7 @@ export default function ClaudeAccessSection() {
       )}
 
       {keys.length > 0 && (
-        <table className="table">
+        <table className="table stack">
           <thead>
             <tr>
               <th>Name</th>
@@ -154,11 +154,11 @@ export default function ClaudeAccessSection() {
                     </span>
                   )}
                 </td>
-                <td>{SCOPE_LABEL[k.scope]}</td>
-                <td>
+                <td data-label="Access">{SCOPE_LABEL[k.scope]}</td>
+                <td data-label="Key">
                   <code>{k.prefix}…</code>
                 </td>
-                <td>
+                <td data-label="Last used">
                   {k.revoked_at ? `Revoked ${day(k.revoked_at)}` : k.last_used_at ? day(k.last_used_at) : 'Never used'}
                   {!k.revoked_at && k.expires_at ? ` · expires ${day(k.expires_at)}` : ''}
                 </td>

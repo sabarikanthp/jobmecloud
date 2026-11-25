@@ -161,7 +161,7 @@ export default function LimitsSection({ mode }: { mode: SectionMode }) {
               <Tip text="Used only to estimate what a run costs. Local models cost nothing, so they don't need a row." />
             </div>
             {rows.length > 0 && (
-              <table>
+              <table className="stack">
                 <thead>
                   <tr>
                     <th>Model</th>
@@ -176,7 +176,7 @@ export default function LimitsSection({ mode }: { mode: SectionMode }) {
                     const active = name !== ''
                     return (
                       <tr key={i}>
-                        <td>
+                        <td data-label="Model">
                           <input
                             aria-label={`Model ${i + 1}`}
                             value={r.model}
@@ -184,7 +184,7 @@ export default function LimitsSection({ mode }: { mode: SectionMode }) {
                           />
                           {duplicates.has(name) && <div className="result bad">Each model can appear only once.</div>}
                         </td>
-                        <td>
+                        <td data-label="Input $/M">
                           <input
                             aria-label={`Input price ${i + 1}`}
                             inputMode="decimal"
@@ -193,7 +193,7 @@ export default function LimitsSection({ mode }: { mode: SectionMode }) {
                           />
                           {active && !validNumber(r.input) && <div className="result bad">{NUMBER_ERROR}</div>}
                         </td>
-                        <td>
+                        <td data-label="Output $/M">
                           <input
                             aria-label={`Output price ${i + 1}`}
                             inputMode="decimal"
